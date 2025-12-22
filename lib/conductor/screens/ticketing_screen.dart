@@ -15,8 +15,9 @@ import '../../common/services/database_service.dart';
 import '../../common/services/location_service.dart';
 import 'manage_occupancy_screen.dart';
 import 'conductor_home_screen.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-const String googleMapsApiKey = "AIzaSyAby-Yt_aqeErBabBi_jUXVp2UlT-lLmxo"; 
+ 
 
 class MapPlace {
   final String name;
@@ -41,6 +42,7 @@ class _TicketingScreenState extends State<TicketingScreen> {
   final _db = DatabaseService();
   final _loc = LocationService();
   final SupabaseClient supabase = Supabase.instance.client;
+  final String googleMapsApiKey = dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
 
   StreamSubscription? _gpsSub;
   late final Stream<List<Map<String, dynamic>>> _busStream;

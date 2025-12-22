@@ -43,6 +43,7 @@ dependencies:
   google_mlkit_translation: ^0.10.0
   flutter_localizations:
     sdk: flutter
+  flutter_dotenv: ^6.0.0
 
 dev_dependencies:
   flutter_test:
@@ -52,3 +53,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: true
+  assets:                 # <--- ADD THIS SECTION
+    - .env

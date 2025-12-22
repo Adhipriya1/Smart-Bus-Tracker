@@ -7,17 +7,20 @@ import 'conductor/screens/login_screen.dart';
 import 'passenger/screens/home_map_screen.dart';
 import 'conductor/screens/trip_selection_screen.dart';
 import 'package:smart_bus_tracker/common/theme_manager.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // REPLACE WITH YOUR ACTUAL KEYS
-  await Supabase.initialize(
-    url: 'https://nwnkpxfrgrlsjytmzavd.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im53bmtweGZyZ3Jsc2p5dG16YXZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU3NzMwNzQsImV4cCI6MjA4MTM0OTA3NH0.5GkJ_agDGRxFK2SsgA6dbbGwgWV5f2zG7lK4UcJgNiA',
-  );
+  // 1. Load the .env file
+  await dotenv.load(fileName: ".env");
 
+  // 2. Use the keys from .env
+  await Supabase.initialize(
+    url: dotenv.env['SUPABASE_URL'] ?? '',
+    anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
+  );
   runApp(const MyApp());
 }
 

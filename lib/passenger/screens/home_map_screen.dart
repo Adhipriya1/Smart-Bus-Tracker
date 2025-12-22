@@ -6,9 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-// --- CONFIGURATION ---
-const String googleMapsApiKey = "AIzaSyAby-Yt_aqeErBabBi_jUXVp2UlT-lLmxo";
 
 class PassengerMapScreen extends StatefulWidget {
   final String? focusedBusId;
@@ -25,7 +24,8 @@ class PassengerMapScreen extends StatefulWidget {
 class _PassengerMapScreenState extends State<PassengerMapScreen> {
   final SupabaseClient supabase = Supabase.instance.client;
   GoogleMapController? _mapController;
-  
+  final String googleMapsApiKey = dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
+
   Set<Marker> _markers = {};
   Set<Polyline> _polylines = {}; // To store the route line
   LatLng? _userLocation;
