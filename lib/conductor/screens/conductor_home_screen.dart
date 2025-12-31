@@ -49,10 +49,10 @@ class _ConductorHomeScreenState extends State<ConductorHomeScreen> {
     final shouldSend = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(children: [
+        title: Row(children: [
           Icon(Icons.warning, color: Colors.red), 
           SizedBox(width: 10), 
-          TranslatedText("CONFIRM EMERGENCY") 
+          TranslatedText("CONFIRM EMERGENCY", style: TextStyle(fontSize: 15),) 
         ]),
         content: const TranslatedText("Are you sure you want to send an SOS Alert to the Admin? This will share your live location."),
         actions: [

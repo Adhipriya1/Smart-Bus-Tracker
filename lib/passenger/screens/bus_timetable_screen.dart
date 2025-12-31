@@ -23,7 +23,7 @@ class BusTimetableScreen extends StatelessWidget {
           if (routes.isEmpty) return const Center(child: TranslatedText("No routes active"));
 
           return ListView.builder(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(10),
             itemCount: routes.length,
             itemBuilder: (context, index) {
               final route = routes[index];
@@ -33,9 +33,9 @@ class BusTimetableScreen extends StatelessWidget {
               return Card(
                 elevation: 3,
                 margin: const EdgeInsets.only(bottom: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(10),
                   child: Column(
                     children: [
                       Row(
@@ -55,7 +55,7 @@ class BusTimetableScreen extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 12),
-                              Text(route['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              Text(route['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10)),
                             ],
                           ),
                           const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),

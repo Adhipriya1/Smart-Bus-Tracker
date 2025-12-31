@@ -55,13 +55,14 @@ class _AdminAssignScreenState extends State<AdminAssignScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                decoration: const InputDecoration(labelText: 'Select Bus'),
+                decoration: InputDecoration(labelText: 'Select Bus'),
                 items: _buses.map((b) => DropdownMenuItem(value: b['id'] as String, child: Text(b['license_plate']))).toList(),
                 onChanged: (v) => setSt(() => selectedBus = v),
               ),
               const SizedBox(height: 10),
+              Padding(padding: const EdgeInsets.only(top: 10)),
               DropdownButtonFormField<String>(
-                decoration: const InputDecoration(labelText: 'Select Route'),
+                decoration: InputDecoration(labelText: 'Select Route'),
                 items: _routes.map((r) => DropdownMenuItem(value: r['id'] as String, child: Text("${r['route_number']} - ${r['name']}"))).toList(),
                 onChanged: (v) => setSt(() => selectedRoute = v),
               ),
@@ -102,14 +103,14 @@ class _AdminAssignScreenState extends State<AdminAssignScreen> {
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator())
         : ListView.builder(
-            padding: const EdgeInsets.all(16),
+            padding:  EdgeInsets.all(13),
             itemCount: _conductors.length,
             itemBuilder: (context, index) {
               final c = _conductors[index];
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.all(13),
                   child: Column(
                     children: [
                       Row(
