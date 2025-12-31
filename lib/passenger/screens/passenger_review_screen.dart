@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart';
 
 class PassengerReviewScreen extends StatefulWidget {
   const PassengerReviewScreen({super.key});
@@ -12,7 +13,6 @@ class _PassengerReviewScreenState extends State<PassengerReviewScreen> {
   final SupabaseClient supabase = Supabase.instance.client;
   final _commentCtrl = TextEditingController();
   
-  // State variables
   String? _selectedBusId;
   int _rating = 0;
   List<Map<String, dynamic>> _buses = [];
@@ -25,14 +25,9 @@ class _PassengerReviewScreenState extends State<PassengerReviewScreen> {
     _fetchBuses();
   }
 
-  // Fetch list of active buses so passenger can select which one they rode
   Future<void> _fetchBuses() async {
     try {
-      final data = await supabase
-          .from('buses')
-          .select('id, license_plate')
-          .eq('is_active', true)
-          .order('license_plate');
+      final data = await supabase.from('buses').select('id, license_plate').eq('is_active', true).order('license_plate');
       
       if (mounted) {
         setState(() {
@@ -41,62 +36,39 @@ class _PassengerReviewScreenState extends State<PassengerReviewScreen> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      if(mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _submitReview() async {
-    if (_selectedBusId == null || _rating == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please select a bus and give a rating.")),
-      );
+    if (_rating == 0 || _selectedBusId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: TranslatedText("Please select bus and rating")));
       return;
     }
 
     setState(() => _isSubmitting = true);
+    final user = supabase.auth.currentUser;
 
     try {
-      final user = supabase.auth.currentUser;
-      final passengerName = user?.userMetadata?['full_name'] ?? user?.email ?? "Anonymous";
-
-      // Insert into 'reviews' table
       await supabase.from('reviews').insert({
-        // Find the license plate string based on the ID for easier reading in Admin
-        'bus_id': _buses.firstWhere((b) => b['id'] == _selectedBusId)['license_plate'], 
+        'bus_id': _selectedBusId,
+        'passenger_id': user?.id,
+        'passenger_name': user?.userMetadata?['full_name'] ?? 'Anonymous',
         'rating': _rating,
-        'comment': _commentCtrl.text,
-        'passenger_name': passengerName,
-        // created_at is auto-generated
+        'comment': _commentCtrl.text.trim(),
       });
 
       if (mounted) {
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Icon(Icons.check_circle, color: Colors.green, size: 50),
-            content: const Text("Thank you for your feedback!"),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context); // Close dialog
-                  Navigator.pop(context); // Go back
-                },
-                child: const Text("CLOSE"),
-              )
-            ],
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: TranslatedText("Thank you for your feedback!"), backgroundColor: Colors.green));
+        Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
-  // Helper to build Star Rating Row
   Widget _buildStarRating() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -116,31 +88,33 @@ class _PassengerReviewScreenState extends State<PassengerReviewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Rate Your Ride")),
+      appBar: AppBar(title: const TranslatedText("Rate Your Ride")),
       body: _isLoading 
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator()) 
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.all(24),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Which bus were you on?", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 10),
+                  const Icon(Icons.rate_review_outlined, size: 80, color: Colors.blueGrey),
+                  const SizedBox(height: 20),
+                  const TranslatedText("How was your recent trip?", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 30),
+                  
                   DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      label: TranslatedText("Select Bus"),
+                      border: OutlineInputBorder(),
+                    ),
                     value: _selectedBusId,
-                    decoration: const InputDecoration(border: OutlineInputBorder(), hintText: "Select Bus Number"),
-                    items: _buses.map((b) {
-                      return DropdownMenuItem<String>(
-                        value: b['id'],
-                        child: Text(b['license_plate']),
-                      );
-                    }).toList(),
-                    onChanged: (v) => setState(() => _selectedBusId = v),
+                    items: _buses.map((bus) => DropdownMenuItem(
+                      value: bus['id'] as String,
+                      child: Text(bus['license_plate']), // License plates usually don't translate
+                    )).toList(),
+                    onChanged: (val) => setState(() => _selectedBusId = val),
                   ),
                   
                   const SizedBox(height: 30),
-                  
-                  const Center(child: Text("How was your experience?", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
+                  const Center(child: TranslatedText("Tap to Rate", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 18))),
                   const SizedBox(height: 10),
                   _buildStarRating(),
                   
@@ -150,8 +124,8 @@ class _PassengerReviewScreenState extends State<PassengerReviewScreen> {
                     controller: _commentCtrl,
                     maxLines: 4,
                     decoration: const InputDecoration(
-                      labelText: "Comments (Optional)",
-                      hintText: "Driver was polite, Bus was clean...",
+                      label: TranslatedText("Comments (Optional)"),
+                      hintText: "Driver was polite, Bus was clean...", // Standard hint
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -166,7 +140,7 @@ class _PassengerReviewScreenState extends State<PassengerReviewScreen> {
                       onPressed: _isSubmitting ? null : _submitReview,
                       child: _isSubmitting 
                           ? const CircularProgressIndicator() 
-                          : const Text("SUBMIT REVIEW", style: TextStyle(fontWeight: FontWeight.bold)),
+                          : const TranslatedText("SUBMIT REVIEW", style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],

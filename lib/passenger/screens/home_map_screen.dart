@@ -7,15 +7,14 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart'; 
+import 'package:smart_bus_tracker/common/services/places_service.dart';
+import 'package:smart_bus_tracker/common/widgets/language_selector.dart';
 
 class PassengerMapScreen extends StatefulWidget {
   final String? focusedBusId;
 
-  const PassengerMapScreen({
-    super.key,
-    this.focusedBusId,
-  });
+  const PassengerMapScreen({super.key, this.focusedBusId});
 
   @override
   State<PassengerMapScreen> createState() => _PassengerMapScreenState();
@@ -23,20 +22,27 @@ class PassengerMapScreen extends StatefulWidget {
 
 class _PassengerMapScreenState extends State<PassengerMapScreen> {
   final SupabaseClient supabase = Supabase.instance.client;
+  final PlacesService _placesService = PlacesService();
   GoogleMapController? _mapController;
   final String googleMapsApiKey = dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
 
-  Set<Marker> _markers = {};
-  Set<Polyline> _polylines = {}; // To store the route line
+  Set<Marker> _busMarkers = {};
+  Set<Marker> _stopMarkers = {};
+  Set<Polyline> _polylines = {}; 
   LatLng? _userLocation;
   String _etaText = "Locating bus...";
   
   StreamSubscription? _busSubscription;
-  Timer? _directionsTimer; // Throttle API calls
+  Timer? _directionsTimer;
+  
+  // 🔴 STRICT THROTTLING VARIABLES
+  Timer? _throttleTimer;
+  List<Map<String, dynamic>>? _pendingData;
+  bool _isProcessing = false;
 
   static const CameraPosition _kInitialPosition = CameraPosition(
-    target: LatLng(19.0760, 72.8777),
-    zoom: 12,
+    target: LatLng(19.0760, 72.8777), // Mumbai Default
+    zoom: 14, 
   );
 
   @override
@@ -50,11 +56,11 @@ class _PassengerMapScreenState extends State<PassengerMapScreen> {
   void dispose() {
     _busSubscription?.cancel();
     _directionsTimer?.cancel();
+    _throttleTimer?.cancel();
     _mapController?.dispose();
     super.dispose();
   }
 
-  // 1. GET USER LOCATION
   Future<void> _getUserLocation() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) return;
@@ -66,81 +72,117 @@ class _PassengerMapScreenState extends State<PassengerMapScreen> {
     }
 
     Position pos = await Geolocator.getCurrentPosition();
+    final latLng = LatLng(pos.latitude, pos.longitude);
+    
+    if (mounted) {
+      setState(() => _userLocation = latLng);
+      if (widget.focusedBusId == null) {
+        _fetchBusStops(latLng);
+      }
+    }
+  }
+
+  Future<void> _fetchBusStops(LatLng center) async {
+    final stops = await _placesService.getNearbyBusStops(center);
     if (mounted) {
       setState(() {
-        _userLocation = LatLng(pos.latitude, pos.longitude);
+        _stopMarkers = stops.toSet();
       });
     }
   }
 
-  // 2. BUS UPDATES STREAM
+  double? _parseCoord(dynamic value) {
+    if (value is int) return value.toDouble();
+    if (value is double) return value;
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
   void _subscribeToBusUpdates() {
     _busSubscription = supabase
         .from('buses')
         .stream(primaryKey: ['id'])
         .listen((List<Map<String, dynamic>> data) {
       
-      final newMarkers = data.map((busData) {
-        final int seats = busData['seats_available'] ?? 0;
-        final double? lat = busData['current_latitude'] as double?; 
-        final double? long = busData['current_longitude'] as double?;
-        final String plate = busData['license_plate'] ?? "Bus";
+      // 1. Store the latest data immediately
+      _pendingData = data;
 
-        if (lat == null || long == null) return null; 
-
-        final double hue = seats < 5 ? BitmapDescriptor.hueRed : BitmapDescriptor.hueGreen;
-
-        return Marker(
-          markerId: MarkerId(busData['id'].toString()),
-          position: LatLng(lat, long),
-          icon: BitmapDescriptor.defaultMarkerWithHue(hue),
-          infoWindow: InfoWindow(title: plate, snippet: "Seats Left: $seats"),
-        );
-      }).whereType<Marker>().toSet();
-
-      // --- FOCUS & DIRECTIONS LOGIC ---
-      if (widget.focusedBusId != null) {
-        try {
-          final focusedBus = data.firstWhere(
-            (element) => element['id'] == widget.focusedBusId,
-            orElse: () => {},
-          );
-          
-          if (focusedBus.isNotEmpty) {
-             final double? lat = focusedBus['current_latitude'];
-             final double? long = focusedBus['current_longitude'];
-             
-             if (lat != null && long != null) {
-                final busPos = LatLng(lat, long);
-                
-                // Animate Camera to Bus
-                _mapController?.animateCamera(CameraUpdate.newLatLng(busPos));
-                
-                // Fetch Directions (Route Line)
-                if (_userLocation != null) {
-                  _fetchDirections(busPos, _userLocation!);
-                }
-             }
-          }
-        } catch (e) {
-          debugPrint("Error processing focused bus: $e");
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _markers = newMarkers;
-        });
+      // 2. Only start the timer if it's not already running
+      if (!_isProcessing) {
+        _isProcessing = true;
+        // 🔴 UPDATE INTERVAL: 1 Second (1000ms). This is safe for any device.
+        _throttleTimer = Timer(const Duration(milliseconds: 1000), _processPendingData);
       }
     });
   }
 
-  // 3. DIRECTIONS API (Draws Line & Gets ETA)
+  void _processPendingData() {
+    if (!mounted || _pendingData == null) {
+      _isProcessing = false;
+      return;
+    }
+
+    final data = _pendingData!;
+    _pendingData = null; // Clear queue
+
+    final newMarkers = data.map((busData) {
+      final int seats = busData['seats_available'] ?? 0;
+      final double? lat = _parseCoord(busData['current_latitude']) ?? _parseCoord(busData['lat']);
+      final double? long = _parseCoord(busData['current_longitude']) ?? _parseCoord(busData['long']);
+      final String plate = busData['license_plate'] ?? "Bus";
+
+      if (lat == null || long == null) return null; 
+
+      final double hue = seats < 5 ? BitmapDescriptor.hueRed : BitmapDescriptor.hueGreen;
+
+      return Marker(
+        markerId: MarkerId(busData['id'].toString()),
+        position: LatLng(lat, long),
+        icon: BitmapDescriptor.defaultMarkerWithHue(hue),
+        infoWindow: InfoWindow(title: plate, snippet: "Seats Left: $seats"),
+        onTap: () {
+          _fetchBusStops(LatLng(lat, long));
+        },
+      );
+    }).whereType<Marker>().toSet();
+
+    // Handle Focused Bus Animation (Also Throttled now)
+    if (widget.focusedBusId != null) {
+      try {
+        final focusedBus = data.firstWhere(
+          (element) => element['id'] == widget.focusedBusId,
+          orElse: () => {},
+        );
+        
+        if (focusedBus.isNotEmpty) {
+            final double? lat = _parseCoord(focusedBus['current_latitude']) ?? _parseCoord(focusedBus['lat']);
+            final double? long = _parseCoord(focusedBus['current_longitude']) ?? _parseCoord(focusedBus['long']);
+            
+            if (lat != null && long != null) {
+              final busPos = LatLng(lat, long);
+              _mapController?.animateCamera(CameraUpdate.newLatLng(busPos));
+              
+              if (_userLocation != null) {
+                _fetchDirections(busPos, _userLocation!);
+              }
+            }
+        }
+      } catch (e) {
+        debugPrint("Error processing focused bus: $e");
+      }
+    }
+
+    setState(() {
+      _busMarkers = newMarkers;
+    });
+
+    // Allow next update
+    _isProcessing = false; 
+  }
+
   Future<void> _fetchDirections(LatLng origin, LatLng dest) async {
-    // Throttle: Don't call API more than once every 5 seconds
     if (_directionsTimer != null && _directionsTimer!.isActive) return;
-    
-    _directionsTimer = Timer(const Duration(seconds: 5), () {});
+    _directionsTimer = Timer(const Duration(seconds: 10), () {});
 
     try {
       final url = Uri.parse(
@@ -157,11 +199,9 @@ class _PassengerMapScreenState extends State<PassengerMapScreen> {
       if (data['status'] == 'OK') {
         final route = data['routes'][0];
         final leg = route['legs'][0];
-        
         final String duration = leg['duration']['text'];
         final String distance = leg['distance']['text'];
 
-        // Decode Polyline
         final points = PolylinePoints.decodePolyline(route['overview_polyline']['points']);
         final List<LatLng> polylineCoords = points.map((p) => LatLng(p.latitude, p.longitude)).toList();
 
@@ -187,20 +227,27 @@ class _PassengerMapScreenState extends State<PassengerMapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Live Tracking")),
+      appBar: AppBar(
+        title: const TranslatedText("Live Tracking"),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 16.0),
+            child: LanguageButton(), 
+          ),
+        ],
+      ),
       body: Stack(
         children: [
-          // MAP
           GoogleMap(
             initialCameraPosition: _kInitialPosition,
-            markers: _markers,
+            markers: _busMarkers.union(_stopMarkers),
             polylines: _polylines,
             myLocationEnabled: true,
             myLocationButtonEnabled: true,
             onMapCreated: (controller) => _mapController = controller,
+            onCameraIdle: () {}, // Do nothing on idle to prevent loops
           ),
 
-          // ETA CARD (Only if tracking a specific bus)
           if (widget.focusedBusId != null)
             Positioned(
               bottom: 30,
@@ -231,8 +278,8 @@ class _PassengerMapScreenState extends State<PassengerMapScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text("Estimated Arrival", style: TextStyle(color: Colors.grey, fontSize: 12)),
-                          Text(
+                          const TranslatedText("Estimated Arrival", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                          TranslatedText(
                             _etaText,
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.black87),
                           ),

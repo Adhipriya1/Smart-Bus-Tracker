@@ -1,5 +1,8 @@
+import 'dart:isolate';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart'; // Updated Import
 import '../../conductor/screens/conductor_home_screen.dart'; 
 
 class ConductorLoginScreen extends StatefulWidget {
@@ -16,10 +19,14 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
   
   bool _isLoading = false;
   bool _isSignup = false; 
+  bool get isTamil {
+    final locale = Localizations.localeOf(context);
+    return locale.languageCode == 'ta';
+  }
 
   Future<void> _handleAuth() async {
     if (_emailCtrl.text.isEmpty || _passwordCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fill all fields")));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: TranslatedText('Please fill all fields')));
       return;
     }
 
@@ -35,10 +42,8 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
 
         if (response.user != null) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Account Created! You can now log in."), backgroundColor: Colors.green),
-            );
-            setState(() => _isSignup = false); 
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: TranslatedText('Signup Successful! Please Login.')));
+            setState(() => _isSignup = false);
           }
         }
       } else {
@@ -51,15 +56,15 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
           if (mounted) {
             Navigator.pushReplacement(
               context, 
-              MaterialPageRoute(builder: (context) => const ConductorHomeScreen())
+              MaterialPageRoute(builder: (_) => const ConductorHomeScreen())
             );
           }
         }
       }
-    } on AuthException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message), backgroundColor: Colors.red));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -67,77 +72,69 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Theme variables
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = Theme.of(context).primaryColor;
-    final textColor = isDark ? Colors.white : Colors.blue[900];
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_isSignup ? "Create Account" : "Conductor Login"),
-        elevation: 0,
-      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(Icons.directions_bus_filled, size: 80, color: primaryColor),
-              const SizedBox(height: 10),
-              Text(
-                _isSignup ? "Join Smart Bus" : "Welcome Back",
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
+              Icon(Icons.directions_bus, size: 80, color: primaryColor),
+              const SizedBox(height: 20),
+              TranslatedText(
+                _isSignup ? "Create Account" : "Conductor Login", 
+                style: TextStyle(fontSize: isTamil? 15:24, fontWeight: FontWeight.bold)
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 40),
 
-              if (_isSignup) ...[
+              if (_isSignup)
                 TextField(
                   controller: _nameCtrl,
-                  decoration: InputDecoration(
-                    label: const Text("Full Name"),
-                    prefixIcon: const Icon(Icons.person),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  decoration: const InputDecoration(
+                    label: TranslatedText("Full Name"), 
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person)
                   ),
                 ),
-                const SizedBox(height: 16),
-              ],
+              if (_isSignup) const SizedBox(height: 20),
 
               TextField(
                 controller: _emailCtrl,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  label: const Text("Email ID"),
-                  prefixIcon: const Icon(Icons.email),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                decoration: const InputDecoration(
+                  label: TranslatedText("Email"), 
+                  border: OutlineInputBorder(), 
+                  prefixIcon: Icon(Icons.email)
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
               TextField(
                 controller: _passwordCtrl,
                 obscureText: true,
-                decoration: InputDecoration(
-                  label: const Text("Password"),
-                  prefixIcon: const Icon(Icons.lock),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                decoration: const InputDecoration(
+                  label: TranslatedText("Password"), 
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.lock)
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 30),
 
               SizedBox(
+                width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _handleAuth,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor, // Uses Blue[900] from theme
+                    backgroundColor: primaryColor, 
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: _isLoading 
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : Text(_isSignup ? "SIGN UP" : "LOGIN", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    : TranslatedText(_isSignup ? "SIGN UP" : "LOGIN", style:TextStyle(fontSize: isTamil? 12:16, fontWeight: FontWeight.bold)),
                 ),
               ),
 
@@ -152,11 +149,13 @@ class _ConductorLoginScreenState extends State<ConductorLoginScreen> {
                     _nameCtrl.clear();
                   });
                 },
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                // 🔴 FIX: Changed Row to Wrap to handle overflow on small screens
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                     Text(_isSignup ? "Already have an account? " : "Don't have an account? ", style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey, fontSize: 16)),
-                     Text(_isSignup ? "Login" : "Sign Up", style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold)),
+                     TranslatedText(_isSignup ? "Already have an account? " : "Don't have an account? ", style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey, fontSize: isTamil? 12:16)),
+                     TranslatedText(_isSignup ? "Login" : "Sign Up", style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold,fontSize: isTamil? 12:16)),
                   ],
                 ),
               ),

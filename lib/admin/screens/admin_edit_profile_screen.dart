@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
-
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart'; // Updated Import
 
 class AdminEditProfileScreen extends StatefulWidget {
   const AdminEditProfileScreen({super.key});
@@ -28,7 +28,6 @@ class _AdminEditProfileScreenState extends State<AdminEditProfileScreen> {
     _avatarUrl = user?.userMetadata?['avatar_url']; 
   }
 
-  // 1. Pick Image Function
   Future<void> _pickImage() async {
     try {
       final XFile? pickedFile = await _picker.pickImage(
@@ -41,44 +40,31 @@ class _AdminEditProfileScreenState extends State<AdminEditProfileScreen> {
         await _uploadImage(File(pickedFile.path)); 
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error picking image: $e")));
-      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     }
   }
 
-  // 2. Upload Image Function
   Future<void> _uploadImage(File file) async {
     setState(() => _isLoading = true);
     try {
       final userId = user!.id;
       final fileExt = file.path.split('.').last;
-      final fileName = '$userId/admin_avatar.$fileExt'; 
+      final fileName = '$userId/avatar.$fileExt'; 
 
       await Supabase.instance.client.storage
           .from('avatars')
-          .upload(
-            fileName,
-            file,
-            fileOptions: const FileOptions(upsert: true), 
-          );
+          .upload(fileName, file, fileOptions: const FileOptions(upsert: true));
 
-      final imageUrl = Supabase.instance.client.storage
-          .from('avatars')
-          .getPublicUrl(fileName);
+      final imageUrl = Supabase.instance.client.storage.from('avatars').getPublicUrl(fileName);
 
-      await Supabase.instance.client.auth.updateUser(
-        UserAttributes(data: {'avatar_url': imageUrl}),
-      );
+      await Supabase.instance.client.auth.updateUser(UserAttributes(data: {'avatar_url': imageUrl}));
 
       setState(() {
         _avatarUrl = imageUrl;
         _isLoading = false;
       });
       
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile Picture Updated!"), backgroundColor: Colors.green));
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: TranslatedText("Image Uploaded!")));
 
     } catch (e) {
       if (mounted) {
@@ -88,7 +74,6 @@ class _AdminEditProfileScreenState extends State<AdminEditProfileScreen> {
     }
   }
 
-  // 3. Update Name Function
   Future<void> _updateProfile() async {
     setState(() => _isLoading = true);
     try {
@@ -96,7 +81,7 @@ class _AdminEditProfileScreenState extends State<AdminEditProfileScreen> {
         UserAttributes(data: {'full_name': _nameCtrl.text}),
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Admin Profile Updated!"), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: TranslatedText("Profile Updated!"), backgroundColor: Colors.green));
         Navigator.pop(context);
       }
     } catch (e) {
@@ -109,8 +94,8 @@ class _AdminEditProfileScreenState extends State<AdminEditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Edit Admin Profile")),
-      body: SingleChildScrollView(
+      appBar: AppBar(title: const TranslatedText("Edit Profile")),
+      body: SingleChildScrollView( 
         padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
@@ -124,14 +109,9 @@ class _AdminEditProfileScreenState extends State<AdminEditProfileScreen> {
                     backgroundColor: Colors.grey[200],
                     backgroundImage: _imageFile != null
                         ? FileImage(_imageFile!) 
-                        : (_avatarUrl != null 
-                            ? NetworkImage(_avatarUrl!) as ImageProvider 
-                            : null), 
-                    child: (_imageFile == null && _avatarUrl == null)
-                        ? const Icon(Icons.admin_panel_settings, size: 60, color: Colors.grey)
-                        : null,
+                        : (_avatarUrl != null ? NetworkImage(_avatarUrl!) as ImageProvider : null), 
+                    child: (_imageFile == null && _avatarUrl == null) ? const Icon(Icons.person, size: 60, color: Colors.grey) : null,
                   ),
-                  
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: const BoxDecoration(color: Colors.blue, shape: BoxShape.circle),
@@ -148,7 +128,7 @@ class _AdminEditProfileScreenState extends State<AdminEditProfileScreen> {
             TextField(
               controller: _nameCtrl,
               decoration: const InputDecoration(
-                label: Text("Admin Name"), 
+                label: TranslatedText("Admin Name"), 
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.person)
               ),
@@ -157,7 +137,7 @@ class _AdminEditProfileScreenState extends State<AdminEditProfileScreen> {
             TextField(
               controller: _phone,
               decoration: const InputDecoration(
-                label: Text("Phone No"), 
+                label: TranslatedText("Phone No"), 
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.phone)
               ),
@@ -166,7 +146,7 @@ class _AdminEditProfileScreenState extends State<AdminEditProfileScreen> {
             TextField(
               enabled: false,
               decoration: InputDecoration(
-                label: const Text("Email"), 
+                label: const TranslatedText("Email"), 
                 border: const OutlineInputBorder(), 
                 hintText: user?.email,
                 prefixIcon: const Icon(Icons.email),
@@ -182,7 +162,7 @@ class _AdminEditProfileScreenState extends State<AdminEditProfileScreen> {
               height: 50,
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _updateProfile,
-                child: _isLoading ? const CircularProgressIndicator() : const Text("SAVE CHANGES"),
+                child: _isLoading ? const CircularProgressIndicator() : const TranslatedText("SAVE CHANGES"),
               ),
             ),
           ],

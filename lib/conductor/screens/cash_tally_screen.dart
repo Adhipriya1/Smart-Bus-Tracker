@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart'; // Updated Import
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CashTallyScreen extends StatefulWidget {
@@ -12,7 +13,6 @@ class CashTallyScreen extends StatefulWidget {
 class _CashTallyScreenState extends State<CashTallyScreen> {
   final SupabaseClient supabase = Supabase.instance.client;
   
-  // Counts for notes
   final Map<int, TextEditingController> _controllers = {
     500: TextEditingController(),
     200: TextEditingController(),
@@ -31,7 +31,6 @@ class _CashTallyScreenState extends State<CashTallyScreen> {
   void initState() {
     super.initState();
     _fetchSystemTotal();
-    // Listen to changes to auto-calculate
     for (var controller in _controllers.values) {
       controller.addListener(_calculatePhysical);
     }
@@ -39,7 +38,6 @@ class _CashTallyScreenState extends State<CashTallyScreen> {
 
   Future<void> _fetchSystemTotal() async {
     try {
-      // Get start and end of today
       final now = DateTime.now();
       final startOfDay = DateTime(now.year, now.month, now.day).toIso8601String();
       final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59).toIso8601String();
@@ -76,10 +74,9 @@ class _CashTallyScreenState extends State<CashTallyScreen> {
     setState(() => _physicalTotal = total);
   }
 
-  // --- NEW: SUBMIT FUNCTION ---
   Future<void> _submitTally() async {
     if (_physicalTotal == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please enter cash amounts first.")));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: TranslatedText("Please enter cash amounts first.")));
       return;
     }
 
@@ -88,12 +85,11 @@ class _CashTallyScreenState extends State<CashTallyScreen> {
     try {
       final user = supabase.auth.currentUser;
       
-      // Insert into Supabase
       await supabase.from('daily_collections').insert({
         'bus_id': widget.busId,
         'amount_collected': _physicalTotal,
         'conductor_id': user?.id,
-        'date': DateTime.now().toIso8601String(), // Current Date
+        'date': DateTime.now().toIso8601String(),
       });
 
       if (mounted) {
@@ -102,14 +98,21 @@ class _CashTallyScreenState extends State<CashTallyScreen> {
           barrierDismissible: false,
           builder: (_) => AlertDialog(
             title: const Icon(Icons.check_circle, color: Colors.green, size: 50),
-            content: Text("Collection of ₹$_physicalTotal submitted successfully to Admin."),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const TranslatedText("Collection submitted successfully to Admin."),
+                const SizedBox(height: 5),
+                Text("Total: ₹$_physicalTotal", style: const TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
             actions: [
               TextButton(
                 onPressed: () {
                   Navigator.pop(context); // Close dialog
                   Navigator.pop(context); // Go back to Home
                 },
-                child: const Text("DONE"),
+                child: const TranslatedText("DONE"),
               )
             ],
           ),
@@ -117,7 +120,7 @@ class _CashTallyScreenState extends State<CashTallyScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -132,7 +135,7 @@ class _CashTallyScreenState extends State<CashTallyScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Daily Cash Tally"), backgroundColor: Colors.blue[900], foregroundColor: Colors.white),
+      appBar: AppBar(title: const TranslatedText("Daily Cash Tally"), backgroundColor: Colors.blue[900], foregroundColor: Colors.white),
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator())
         : Column(
@@ -146,7 +149,7 @@ class _CashTallyScreenState extends State<CashTallyScreen> {
                   children: [
                     _buildSummaryItem("System", "₹$_systemTotal", Colors.blue),
                     _buildSummaryItem("Physical", "₹$_physicalTotal", isDark ? Colors.white : Colors.black),
-                    _buildSummaryItem("Status", statusText, statusColor),
+                    _buildSummaryItem("Status", statusText, statusColor), // Note: statusText contains numbers, might just keep as Text or handle partially
                   ],
                 ),
               ),
@@ -154,7 +157,7 @@ class _CashTallyScreenState extends State<CashTallyScreen> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    const Text("Enter Note Counts:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const TranslatedText("Enter Note Counts:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 10),
                     ..._controllers.entries.map((entry) => _buildNoteInput(entry.key, entry.value, isDark)),
                   ],
@@ -167,10 +170,10 @@ class _CashTallyScreenState extends State<CashTallyScreen> {
                   height: 50,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                    onPressed: _isSubmitting ? null : _submitTally, // Linked to logic
+                    onPressed: _isSubmitting ? null : _submitTally, 
                     child: _isSubmitting 
                         ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text("SUBMIT TALLY", style: TextStyle(fontWeight: FontWeight.bold)),
+                        : const TranslatedText("SUBMIT TALLY", style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
               )
@@ -182,7 +185,7 @@ class _CashTallyScreenState extends State<CashTallyScreen> {
   Widget _buildSummaryItem(String label, String value, Color color) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(color: Colors.grey)),
+        TranslatedText(label, style: const TextStyle(color: Colors.grey)),
         Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
       ],
     );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart'; // Updated Import
 
 class AdminComplaintsScreen extends StatefulWidget {
   const AdminComplaintsScreen({super.key});
@@ -16,17 +17,10 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen> {
     _cleanupOldComplaints();
   }
 
-  // --- AUTOMATIC CLEANUP FUNCTION ---
   Future<void> _cleanupOldComplaints() async {
     try {
       final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7)).toIso8601String();
-
-      await supabase
-          .from('complaints')
-          .delete()
-          .eq('status', 'RESOLVED')
-          .lt('resolved_at', sevenDaysAgo); 
-      
+      await supabase.from('complaints').delete().eq('status', 'RESOLVED').lt('resolved_at', sevenDaysAgo); 
     } catch (e) {
       debugPrint("Auto-cleanup error: $e");
     }
@@ -37,96 +31,61 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Complaints & Bugs")),
+      appBar: AppBar(title: const TranslatedText("Complaints & Bugs")),
       body: StreamBuilder(
-        stream: supabase.from('complaints').stream(primaryKey: ['id']).order('created_at'),
+        stream: supabase.from('complaints').stream(primaryKey: ['id']).order('created_at', ascending: false),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.check_circle_outline, size: 60, color: Colors.grey[400]),
-                  const SizedBox(height: 16),
-                  Text("No active complaints!", style: TextStyle(color: Colors.grey[600], fontSize: 16)),
-                ],
-              ),
-            );
-          }
+          final bugs = snapshot.data as List;
+          if (bugs.isEmpty) return const Center(child: TranslatedText("No complaints found."));
 
-          final items = snapshot.data!;
           return ListView.builder(
-            padding: const EdgeInsets.all(12),
-            itemCount: items.length,
-            itemBuilder: (ctx, i) {
-              final bug = items[i];
+            padding: const EdgeInsets.all(16),
+            itemCount: bugs.length,
+            itemBuilder: (context, index) {
+              final bug = bugs[index];
               final isResolved = bug['status'] == 'RESOLVED';
 
               return Card(
-                elevation: 2,
+                color: isResolved ? (isDark ? Colors.grey[900] : Colors.green[50]) : null,
                 margin: const EdgeInsets.only(bottom: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                color: isDark ? Colors.grey[800] : Colors.white,
                 child: ExpansionTile(
-                  leading: CircleAvatar(
-                    backgroundColor: isResolved ? Colors.green[100] : Colors.red[100],
-                    child: Icon(
-                      isResolved ? Icons.check : Icons.report_problem, 
-                      color: isResolved ? Colors.green : Colors.red
-                    ),
+                  leading: Icon(
+                    isResolved ? Icons.check_circle : Icons.report_problem,
+                    color: isResolved ? Colors.green : Colors.red
                   ),
-                  title: Text(
-                    bug['subject'] ?? 'No Subject',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      decoration: isResolved ? TextDecoration.lineThrough : null,
-                      color: isResolved ? Colors.grey : (isDark ? Colors.white : Colors.black87),
-                    ),
-                  ),
-                  subtitle: Text("From: ${bug['user_email'] ?? 'Anonymous'}"),
+                  title: Text(bug['title'] ?? 'No Title', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: TranslatedText(isResolved ? "Resolved" : "Pending Action", style: TextStyle(color: isResolved ? Colors.green : Colors.orange)),
                   children: [
                     Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const Text("Description:", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-                          const SizedBox(height: 4),
-                          bug['description'] != null 
-                            ? Text(bug['description'])
-                            : const Text('No Description provided.'),
-                          const SizedBox(height: 20),
-                          
-                          // --- ACTION BUTTON ---
-                          SizedBox(
-                            width: double.infinity,
+                          TranslatedText("Description:", style: const TextStyle(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 5),
+                          Text(bug['description'] ?? "No description"),
+                          const SizedBox(height: 15),
+                          Align(
+                            alignment: Alignment.centerRight,
                             child: isResolved
                               ? Container(
-                                  padding: const EdgeInsets.all(12),
+                                  padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: Colors.green.withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(color: Colors.green.withOpacity(0.3))
                                   ),
-                                  child: const Text(
-                                    "✓  RESOLVED (Will auto-delete in 7 days)",
+                                  child: const TranslatedText(
+                                    "✓  RESOLVED (Will auto-delete in 7 days)", 
                                     style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)
                                   ),
                                 )
                               : ElevatedButton.icon(
                                   icon: const Icon(Icons.check_circle_outline),
-                                  label: const Text("MARK AS RESOLVED"),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                  ),
+                                  label: const TranslatedText("MARK AS RESOLVED"),
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
                                   onPressed: () async {
-                                    // Update Status AND set the Resolution Time
                                     await supabase.from('complaints').update({
                                       'status': 'RESOLVED',
                                       'resolved_at': DateTime.now().toIso8601String(), 

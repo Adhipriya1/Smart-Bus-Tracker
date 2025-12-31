@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'home_map_screen.dart'; // Reuse your map
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart';
+import 'home_map_screen.dart'; 
 
 class RouteDetailScreen extends StatelessWidget {
   final Map<String, dynamic> busData;
@@ -10,7 +11,6 @@ class RouteDetailScreen extends StatelessWidget {
     // Logic for Availability
     final int capacity = busData['seating_capacity'] ?? 40;
     final int occupied = busData['seats_occupied'] ?? 0;
-    final int available = capacity - occupied;
     final double fillPercentage = occupied / capacity;
 
     String statusText = "Comfortable";
@@ -28,7 +28,7 @@ class RouteDetailScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(busData['license_plate'])),
+      appBar: AppBar(title: Text(busData['license_plate'])), // License plate is code
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -36,7 +36,7 @@ class RouteDetailScreen extends StatelessWidget {
           children: [
             const SizedBox(height: 20),
             
-            // 1. CROWD STATUS CARD
+            // CROWD STATUS CARD
             Container(
               padding: const EdgeInsets.all(30),
               width: double.infinity,
@@ -49,49 +49,48 @@ class RouteDetailScreen extends StatelessWidget {
                 children: [
                   Icon(statusIcon, size: 50, color: statusColor),
                   const SizedBox(height: 10),
-                  Text(statusText, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: statusColor)),
+                  TranslatedText(
+                    statusText, 
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: statusColor),
+                    textAlign: TextAlign.center,
+                  ),
                   const SizedBox(height: 5),
-                  Text("$available seats free", style: const TextStyle(color: Colors.black54)),
+                  const TranslatedText("Occupancy Status", style: TextStyle(color: Colors.grey)),
                 ],
               ),
             ),
             
             const SizedBox(height: 40),
-
-            // 2. LIVE DELAY INFO
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(12)),
-              child: const Row(
-                children: [
-                  Icon(Icons.timer, color: Colors.blue),
-                  SizedBox(width: 15),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Estimated Arrival", style: TextStyle(color: Colors.grey)),
-                      Text("5 mins", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    ],
-                  )
-                ],
-              ),
+            
+            ListTile(
+              leading: const Icon(Icons.event_seat),
+              title: const TranslatedText("Seats Available"),
+              trailing: Text("${capacity - occupied}", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.info_outline),
+              title: const TranslatedText("Bus Type"),
+              trailing: TranslatedText(busData['bus_type'] ?? "Standard"),
             ),
 
             const Spacer(),
-
-            // 3. TRACK ON MAP BUTTON
+            
             SizedBox(
               width: double.infinity,
-              height: 55,
+              height: 50,
               child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue[900], foregroundColor: Colors.white),
-                icon: const Icon(Icons.map),
-                label: const Text("TRACK ON MAP", style: TextStyle(fontSize: 18)),
                 onPressed: () {
-                   Navigator.push(context, MaterialPageRoute(builder: (_) => PassengerMapScreen(focusedBusId: busData['id'])));
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => PassengerMapScreen(focusedBusId: busData['id'])));
                 },
+                icon: const Icon(Icons.map),
+                label: const TranslatedText('View on Map'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).primaryColor,
+                  foregroundColor: Colors.white,
+                ),
               ),
-            )
+            ),
           ],
         ),
       ),

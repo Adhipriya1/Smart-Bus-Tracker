@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart'; // Updated Import
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -16,7 +17,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final newPassword = _passwordCtrl.text.trim();
     if (newPassword.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Password must be at least 6 characters")),
+        const SnackBar(content: TranslatedText("Password must be at least 6 characters")),
       );
       return;
     }
@@ -30,14 +31,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Password updated successfully!")),
+          const SnackBar(content: TranslatedText("Password updated successfully!")),
         );
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: $e")),
+          SnackBar(content: Text('Error: $e')),
         );
       }
     } finally {
@@ -48,18 +49,18 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Change Password")),
+      appBar: AppBar(title: const TranslatedText("Change Password")),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            const Text("Enter your new password below."),
+            const TranslatedText("Enter your new password below."),
             const SizedBox(height: 20),
             TextField(
               controller: _passwordCtrl,
               obscureText: true,
               decoration: const InputDecoration(
-                label: Text("New Password"),
+                label: TranslatedText("New Password"),
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.lock),
               ),
@@ -72,7 +73,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 onPressed: _isLoading ? null : _updatePassword,
                 child: _isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("UPDATE PASSWORD"),
+                    : const TranslatedText("UPDATE PASSWORD"),
               ),
             ),
           ],

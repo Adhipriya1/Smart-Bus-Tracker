@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ReportBugScreen extends StatefulWidget {
@@ -17,7 +18,7 @@ class _ReportBugScreenState extends State<ReportBugScreen> {
 
   Future<void> _submitBug() async {
     if (_subjectCtrl.text.isEmpty || _descCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fill all fields")));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: TranslatedText("Please fill all fields")));
       return;
     }
 
@@ -36,27 +37,15 @@ class _ReportBugScreenState extends State<ReportBugScreen> {
 
       if (mounted) {
         setState(() => _isSubmitting = false);
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Icon(Icons.check_circle, color: Colors.green, size: 50),
-            content: const Text("Thank you! Your report has been sent to the Admin team."),
-            actions: [
-              TextButton(
-                onPressed: () { 
-                  Navigator.pop(context);
-                  Navigator.pop(context);
-                }, 
-                child: const Text("OK")
-              )
-            ],
-          ),
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: TranslatedText("Report submitted successfully!"), backgroundColor: Colors.green),
         );
+        Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error sending report: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -64,21 +53,22 @@ class _ReportBugScreenState extends State<ReportBugScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Report a Bug")),
-      body: SingleChildScrollView(
+      appBar: AppBar(title: const TranslatedText("Report Bug")),
+      body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Found an issue?", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            const Text("Please describe the bug so we can fix it.", style: TextStyle(color: Colors.grey)),
+            const TranslatedText(
+              "Found a bug or have a suggestion? Let us know!",
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
             const SizedBox(height: 20),
             
             TextField(
               controller: _subjectCtrl,
               decoration: const InputDecoration(
-                labelText: "Subject",
-                hintText: "e.g., App crashed on payment",
+                label: TranslatedText("Subject"),
+                hintText: "e.g., App crashed on payment", 
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.title),
               ),
@@ -89,7 +79,7 @@ class _ReportBugScreenState extends State<ReportBugScreen> {
               controller: _descCtrl,
               maxLines: 5,
               decoration: const InputDecoration(
-                labelText: "Description",
+                label: TranslatedText("Description"),
                 hintText: "Explain what happened...",
                 border: OutlineInputBorder(),
                 alignLabelWithHint: true,
@@ -104,7 +94,7 @@ class _ReportBugScreenState extends State<ReportBugScreen> {
                 icon: const Icon(Icons.send),
                 label: _isSubmitting 
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
-                    : const Text("SUBMIT REPORT"),
+                    : const TranslatedText("SUBMIT REPORT"),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.redAccent, 
                   foregroundColor: Colors.white

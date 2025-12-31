@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart'; // Updated Import
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'inspection_screen.dart'; //
+import 'inspection_screen.dart'; 
 
 class TripSelectionScreen extends StatefulWidget {
   const TripSelectionScreen({super.key});
@@ -18,56 +19,32 @@ class _TripSelectionScreenState extends State<TripSelectionScreen> {
   @override
   void initState() {
     super.initState();
-    _listenForAssignment();
+    _fetchAssignment();
   }
 
-  void _listenForAssignment() {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
+ Future<void> _fetchAssignment() async {
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
 
-    final userId = user.id;
-    final today = DateTime.now().toIso8601String().split('T')[0];
+      // ✅ CHANGE: Query 'daily_assignments' instead of 'assignments'
+      // We assume your table has columns 'bus_id' and 'route_id' that are Foreign Keys
+      final data = await supabase
+          .from('daily_assignments')
+          .select('*, buses(*), routes(*)') 
+          .eq('conductor_id', userId) // ⚠️ Make sure this column exists in daily_assignments
+          .maybeSingle();
 
-    supabase
-        .from('daily_assignments')
-        .select('*, buses(license_plate), routes(route_number, name)')
-        .eq('conductor_id', userId)
-        .eq('assigned_date', today)
-        .maybeSingle()
-        .then((data) {
-          if (mounted) setState(() { _assignment = data; _isLoading = false; });
-    });
-
-    supabase
-        .from('daily_assignments')
-        .stream(primaryKey: ['id'])
-        .eq('conductor_id', userId)
-        .listen((List<Map<String, dynamic>> data) async {
-          if (data.isNotEmpty) {
-             final fullData = await supabase
-                .from('daily_assignments')
-                .select('*, buses(license_plate), routes(route_number, name)')
-                .eq('id', data.first['id'])
-                .maybeSingle();
-             
-             if (mounted) setState(() => _assignment = fullData);
-          }
-    });
-  }
-
-  void _startTrip() {
-    if (_assignment == null) return;
-    
-    // CHANGED: Navigate to Inspection Screen first
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => InspectionScreen(
-          busId: _assignment!['bus_id'],
-          routeId: _assignment!['route_id'],
-        ),
-      ),
-    );
+      if (mounted) {
+        setState(() {
+          _assignment = data;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching assignment: $e");
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -75,92 +52,62 @@ class _TripSelectionScreenState extends State<TripSelectionScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("My Shift", style: TextStyle(fontWeight: FontWeight.bold)),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Today's Assignment", 
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)
-            ),
-            const SizedBox(height: 5),
-            Text(
-              "Please wait for the admin to assign your route.", 
-              style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600])
-            ),
-            
-            const SizedBox(height: 40),
-
-            if (_isLoading)
-              const Center(child: CircularProgressIndicator())
-            else if (_assignment == null)
-              Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.hourglass_empty, size: 80, color: Colors.grey[300]),
-                    const SizedBox(height: 20),
-                    const Text(
-                      "No Route Assigned Yet",
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey),
+      appBar: AppBar(title: const TranslatedText("Today's Shift")),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator()) 
+        : _assignment == null 
+          ? const Center(child: TranslatedText("No bus assigned for today."))
+          : Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildAssignmentCard(_assignment!, isDark),
+                  const Spacer(),
+                  SizedBox(
+                    height: 55,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue[900], foregroundColor: Colors.white),
+                      icon: const Icon(Icons.play_arrow),
+                      label: const TranslatedText("START PRE-CHECK", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      onPressed: () {
+                        Navigator.push(
+                          context, 
+                          MaterialPageRoute(
+                            builder: (_) => InspectionScreen(
+                              busId: _assignment!['buses']['id'],
+                              routeId: _assignment!['routes']['id'],
+                            )
+                          )
+                        );
+                      },
                     ),
-                    const SizedBox(height: 10),
-                    const Text("Contact Admin or refresh later."),
-                  ],
-                ),
-              )
-            else
-              _buildAssignmentCard(isDark),
-
-            const Spacer(),
-            
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.play_circle_fill),
-                label: const Text("START SHIFT", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _assignment != null ? Colors.green : Colors.grey,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: Colors.grey[300],
-                ),
-                onPressed: _assignment != null ? _startTrip : null,
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
     );
   }
 
-  Widget _buildAssignmentCard(bool isDark) {
-    final busData = _assignment!['buses'];
-    final routeData = _assignment!['routes'];
-    
-    final busPlate = busData != null ? busData['license_plate'] : "Unknown Bus";
-    final routeName = routeData != null ? "${routeData['route_number']} - ${routeData['name']}" : "Unknown Route";
+  Widget _buildAssignmentCard(Map<String, dynamic> data, bool isDark) {
+    final busPlate = data['buses']['license_plate'] ?? "Unknown";
+    final routeName = "${data['routes']['route_number']} - ${data['routes']['name']}";
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: isDark ? Colors.blue.withOpacity(0.1) : Colors.blue[50],
+        color: isDark ? Colors.grey[800] : Colors.blue[50],
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.blue.withOpacity(0.3)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Icon(Icons.verified, color: Colors.blue),
               const SizedBox(width: 8),
-              Text("ASSIGNED BY ADMIN", style: TextStyle(color: Colors.blue[800], fontWeight: FontWeight.bold, fontSize: 12)),
+              TranslatedText("Current Assignment", style: TextStyle(color: Colors.blue[800], fontWeight: FontWeight.bold, fontSize: 12)),
             ],
           ),
           const SizedBox(height: 20),
@@ -186,7 +133,7 @@ class _TripSelectionScreenState extends State<TripSelectionScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+              TranslatedText(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
               const SizedBox(height: 4),
               Text(
                 value, 
@@ -200,7 +147,7 @@ class _TripSelectionScreenState extends State<TripSelectionScreen> {
               ),
             ],
           ),
-        ),
+        )
       ],
     );
   }

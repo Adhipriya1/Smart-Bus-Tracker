@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart'; 
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'home_map_screen.dart'; // Ensure this points to your PassengerMapScreen
+import 'home_map_screen.dart'; 
 
 class BusListScreen extends StatefulWidget {
   const BusListScreen({super.key});
@@ -11,14 +12,11 @@ class BusListScreen extends StatefulWidget {
 
 class _BusListScreenState extends State<BusListScreen> {
   final SupabaseClient supabase = Supabase.instance.client;
-
-  // Stream that listens to changes in the 'buses' table instantly
   late final Stream<List<Map<String, dynamic>>> _busesStream;
 
   @override
   void initState() {
     super.initState();
-    // Initialize the stream ordered by license plate
     _busesStream = supabase
         .from('buses')
         .stream(primaryKey: ['id'])
@@ -26,94 +24,115 @@ class _BusListScreenState extends State<BusListScreen> {
         .order('license_plate', ascending: true);
   }
 
+  // 🟢 HELPER: Determine Status based on seat count
+  Widget _buildOccupancyBadge(int seats) {
+    Color color;
+    String statusText;
+    IconData icon;
+
+    if (seats > 20) {
+      color = Colors.green;
+      statusText = "LOW OCCUPANCY";
+      icon = Icons.sentiment_satisfied_alt;
+    } else if (seats > 5) {
+      color = Colors.orange;
+      statusText = "MEDIUM OCCUPANCY";
+      icon = Icons.sentiment_neutral;
+    } else {
+      color = Colors.red;
+      statusText = "HIGH OCCUPANCY";
+      icon = Icons.sentiment_very_dissatisfied;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            statusText,
+            style: TextStyle(
+              color: color, 
+              fontSize: 10, 
+              fontWeight: FontWeight.bold
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Theme awareness
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black87;
-    final cardColor = Theme.of(context).cardTheme.color;
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Select a Bus"),
-      ),
-      // Switch to StreamBuilder for Realtime Updates
+      appBar: AppBar(title: const TranslatedText("Active Buses")),
       body: StreamBuilder<List<Map<String, dynamic>>>(
         stream: _busesStream,
         builder: (context, snapshot) {
-          // 1. Handle Loading State
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+          
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(child: TranslatedText("No active buses found."));
           }
 
-          // 2. Handle Error State
-          if (snapshot.hasError) {
-            return Center(child: Text("Error loading buses: ${snapshot.error}"));
-          }
+          final buses = snapshot.data!;
 
-          // 3. Handle Empty State
-          final buses = snapshot.data ?? [];
-          if (buses.isEmpty) {
-            return const Center(child: Text("No active buses found."));
-          }
-
-          // 4. Build the List
           return ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: buses.length,
             itemBuilder: (context, index) {
               final bus = buses[index];
-              
-              // LOGIC CHANGE: Use 'seats_available' directly (matches Conductor App)
-              final int seatsLeft = bus['seats_available'] ?? 0;
-              final String plate = bus['license_plate'] ?? "Unknown Bus";
-              
-              // Color logic: Red if low seats (< 5), Green otherwise
-              final seatColor = seatsLeft < 5 ? Colors.red : Colors.green;
+              final int seats = bus['seats_available'] ?? 0;
 
               return Card(
+                elevation: 4,
                 margin: const EdgeInsets.only(bottom: 16),
-                elevation: 2,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                color: cardColor,
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(16),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // TOP SECTION: Bus Info
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start, 
                         children: [
                           Container(
                             padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.directions_bus, color: Colors.blue, size: 28),
+                            decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                            child: const Icon(Icons.directions_bus, color: Colors.blue, size: 30),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // 1. License Plate
                                 Text(
-                                  plate,
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: textColor),
+                                  bus['license_plate'], 
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
                                 ),
-                                const SizedBox(height: 4),
+                                
+                                const SizedBox(height: 8),
+                                
+                                // 2. Occupancy Badge (Moved Here)
+                                _buildOccupancyBadge(seats),
+
+                                const SizedBox(height: 8),
+                                
+                                // 3. Seat Count Text
                                 Row(
                                   children: [
-                                    Icon(Icons.event_seat, size: 14, color: seatColor),
+                                    const Icon(Icons.event_seat, size: 14, color: Colors.grey),
                                     const SizedBox(width: 4),
-                                    Text(
-                                      "$seatsLeft seats available",
-                                      style: TextStyle(
-                                        color: seatColor,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14,
-                                      ),
-                                    ),
+                                    Text("$seats ", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                                    const TranslatedText("Seats Available", style: TextStyle(fontSize: 12, color: Colors.grey)),
                                   ],
                                 ),
                               ],
@@ -121,8 +140,7 @@ class _BusListScreenState extends State<BusListScreen> {
                           ),
                         ],
                       ),
-                      
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       
                       // BOTTOM SECTION: Track Button
                       SizedBox(
@@ -136,12 +154,11 @@ class _BusListScreenState extends State<BusListScreen> {
                             elevation: 0,
                           ),
                           icon: const Icon(Icons.location_on, size: 20),
-                          label:  const Text("TRACK LIVE LOCATION", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          label: const TranslatedText("TRACK LIVE LOCATION", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                           onPressed: () {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                // Ensure this maps to your PassengerMapScreen class
                                 builder: (_) => PassengerMapScreen(focusedBusId: bus['id']),
                               ),
                             );

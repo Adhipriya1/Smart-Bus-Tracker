@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart';
+import 'package:smart_bus_tracker/l10n/app_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
@@ -61,7 +63,7 @@ class _TripFareScreenState extends State<TripFareScreen> {
         onError: (response) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(response.errorMessage ?? "Error"), backgroundColor: Colors.red),
+              SnackBar(content: TranslatedText(response.errorMessage ?? "Error"), backgroundColor: Colors.red),
             );
           }
         },
@@ -95,7 +97,10 @@ class _TripFareScreenState extends State<TripFareScreen> {
         }
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) {
+        final loc = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: TranslatedText(loc?.errorSending(e) ?? 'Error: $e')));
+      }
     }
   }
 
@@ -118,8 +123,9 @@ class _TripFareScreenState extends State<TripFareScreen> {
   // --- 3. GOOGLE DIRECTIONS API LOGIC ---
   Future<void> _calculateTrip() async {
     if (_sourcePlace == null || _destPlace == null) {
+      final loc = AppLocalizations.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please select Source and Destination")),
+        SnackBar(content: TranslatedText(loc?.pleaseSelectSourceDestination ?? 'Please select Source and Destination')),
       );
       return;
     }
@@ -174,8 +180,9 @@ class _TripFareScreenState extends State<TripFareScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
+        final loc = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Calculation Failed: $e"), backgroundColor: Colors.red),
+          SnackBar(content: TranslatedText(loc?.errorSending(e) ?? 'Calculation Failed: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -188,7 +195,7 @@ class _TripFareScreenState extends State<TripFareScreen> {
     final textColor = isDark ? Colors.white : Colors.black87;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Trip Fare Calculator")),
+      appBar: AppBar(title: TranslatedText(AppLocalizations.of(context)?.tripFareCalculator ?? 'Trip Fare Calculator')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -237,7 +244,7 @@ class _TripFareScreenState extends State<TripFareScreen> {
                         icon: _isLoading ? const SizedBox.shrink() : const Icon(Icons.search, color: Colors.white),
                         label: _isLoading 
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text("GET REALTIME FARE", style: TextStyle(fontWeight: FontWeight.bold)),
+                          : TranslatedText(AppLocalizations.of(context)?.getRealtimeFare ?? 'GET REALTIME FARE', style: const TextStyle(fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue[800],
                           foregroundColor: Colors.white,
@@ -255,7 +262,7 @@ class _TripFareScreenState extends State<TripFareScreen> {
 
             // --- RESULT SECTION ---
             if (_result != null) ...[
-              Text("Trip Details", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
+              TranslatedText(AppLocalizations.of(context)?.tripDetails ?? 'Trip Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
               const SizedBox(height: 10),
               
               // 1. FARE CARD
@@ -269,9 +276,9 @@ class _TripFareScreenState extends State<TripFareScreen> {
                 ),
                 child: Column(
                   children: [
-                    const Text("ESTIMATED FARE", style: TextStyle(color: Colors.white70, fontSize: 12, letterSpacing: 1.2)),
+                    TranslatedText(AppLocalizations.of(context)?.estimatedFare ?? 'ESTIMATED FARE', style: const TextStyle(color: Colors.white70, fontSize: 12, letterSpacing: 1.2)),
                     const SizedBox(height: 5),
-                    Text(
+                    TranslatedText(
                       "₹${_result!['fare']}", 
                       style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.bold)
                     ),
@@ -292,7 +299,7 @@ class _TripFareScreenState extends State<TripFareScreen> {
               
               const SizedBox(height: 20),
               Center(
-                child: Text("Route: ${_result!['start_address']} ➝ ${_result!['end_address']}", 
+                child: TranslatedText("${AppLocalizations.of(context)?.routeLabel ?? 'Route:'} ${_result!['start_address']} ➝ ${_result!['end_address']}", 
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey[600], fontSize: 12)
                 ),
@@ -333,7 +340,7 @@ class _TripFareScreenState extends State<TripFareScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  TranslatedText(
                     value ?? "Search $label",
                     style: TextStyle(
                       color: value == null ? Colors.grey : textColor,
@@ -344,7 +351,7 @@ class _TripFareScreenState extends State<TripFareScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (address != null)
-                    Text(
+                    TranslatedText(
                       address,
                       style: const TextStyle(color: Colors.grey, fontSize: 11),
                       maxLines: 1,
@@ -372,8 +379,8 @@ class _TripFareScreenState extends State<TripFareScreen> {
         children: [
           Icon(icon, color: color, size: 28),
           const SizedBox(height: 8),
-          Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          TranslatedText(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
+          TranslatedText(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
         ],
       ),
     );

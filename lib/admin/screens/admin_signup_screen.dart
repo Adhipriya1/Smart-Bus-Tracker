@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart'; // Updated Import
 import 'admin_dashboard.dart'; 
 
 class AdminSignupScreen extends StatefulWidget {
@@ -22,11 +23,11 @@ class _AdminSignupScreenState extends State<AdminSignupScreen> {
     final confirm = _confirmPassCtrl.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fill all fields")));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: TranslatedText("Please fill all fields")));
       return;
     }
     if (password != confirm) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Passwords do not match")));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: TranslatedText("Passwords do not match")));
       return;
     }
 
@@ -42,8 +43,6 @@ class _AdminSignupScreenState extends State<AdminSignupScreen> {
       if (res.user == null) throw "Signup failed. Please try again.";
 
       // 2. PROMOTE TO ADMIN
-      // The database trigger automatically made them a 'conductor'. 
-      // We must override that immediately to make them an 'admin'.
       await supabase
           .from('profiles')
           .update({'role': 'admin'})
@@ -51,7 +50,7 @@ class _AdminSignupScreenState extends State<AdminSignupScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content:Text("Admin Account Created!"), backgroundColor: Colors.green)
+          const SnackBar(content: TranslatedText("Admin Account Created!"), backgroundColor: Colors.green)
         );
         
         // 3. Navigate to Dashboard
@@ -63,7 +62,7 @@ class _AdminSignupScreenState extends State<AdminSignupScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -76,7 +75,7 @@ class _AdminSignupScreenState extends State<AdminSignupScreen> {
     return Scaffold(
       backgroundColor: Colors.blueGrey[900],
       appBar: AppBar(
-        title: const Text("Create Admin Account"),
+        title: const TranslatedText("Create Admin Account"),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -93,26 +92,26 @@ class _AdminSignupScreenState extends State<AdminSignupScreen> {
                 children: [
                   const Icon(Icons.person_add, size: 64, color: Colors.blueGrey),
                   const SizedBox(height: 16),
-                  const Text("New Admin Registration", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  const TranslatedText("New Admin Registration", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 32),
                   
                   TextField(
                     controller: _emailCtrl,
-                    decoration: const InputDecoration(label: Text("Email"), prefixIcon: Icon(Icons.email), border: OutlineInputBorder()),
+                    decoration: const InputDecoration(label: TranslatedText("Email"), prefixIcon: Icon(Icons.email), border: OutlineInputBorder()),
                   ),
                   const SizedBox(height: 16),
                   
                   TextField(
                     controller: _passCtrl,
                     obscureText: true,
-                    decoration: const InputDecoration(label: Text("Password"), prefixIcon: Icon(Icons.lock), border: OutlineInputBorder()),
+                    decoration: const InputDecoration(label: TranslatedText("Password"), prefixIcon: Icon(Icons.lock), border: OutlineInputBorder()),
                   ),
                   const SizedBox(height: 16),
                   
                   TextField(
                     controller: _confirmPassCtrl,
                     obscureText: true,
-                    decoration: const InputDecoration(label: Text("Confirm Password"), prefixIcon: Icon(Icons.lock_outline), border: OutlineInputBorder()),
+                    decoration: const InputDecoration(label: TranslatedText("Confirm Password"), prefixIcon: Icon(Icons.lock_outline), border: OutlineInputBorder()),
                   ),
                   const SizedBox(height: 24),
                   
@@ -127,7 +126,7 @@ class _AdminSignupScreenState extends State<AdminSignupScreen> {
                       onPressed: _isLoading ? null : _handleAdminSignup,
                       child: _isLoading
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text("REGISTER & LOGIN"),
+                          : const TranslatedText("REGISTER & LOGIN"),
                     ),
                   ),
                 ],

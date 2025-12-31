@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart'; // Updated Import
 
 class AdminRoutesScreen extends StatefulWidget {
   const AdminRoutesScreen({super.key});
@@ -26,7 +27,7 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Manage Routes")),
+      appBar: AppBar(title: const TranslatedText("Manage Routes")),
       body: Column(
         children: [
           Padding(
@@ -37,12 +38,12 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
                 child: Column(
                   children: [
                     Row(children: [
-                      Expanded(child: TextField(controller: _numCtrl, decoration: const InputDecoration(label: Text("Route No")))),
+                      Expanded(child: TextField(controller: _numCtrl, decoration: const InputDecoration(label: TranslatedText("Route No")))),
                       const SizedBox(width: 10),
-                      Expanded(child: TextField(controller: _nameCtrl, decoration: const InputDecoration(label: Text("Route Name")))),
+                      Expanded(child: TextField(controller: _nameCtrl, decoration: const InputDecoration(label: TranslatedText("Route Name")))),
                     ]),
                     const SizedBox(height: 10),
-                    ElevatedButton(onPressed: _addRoute, child: const Text("Add Route"))
+                    ElevatedButton(onPressed: _addRoute, child: const TranslatedText("Add Route"))
                   ],
                 ),
               ),
@@ -53,7 +54,7 @@ class _AdminRoutesScreenState extends State<AdminRoutesScreen> {
               stream: supabase.from('routes').stream(primaryKey: ['id']).order('created_at'),
               builder: (ctx, snapshot) {
                 if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-                final routes = snapshot.data!;
+                final routes = snapshot.data as List;
                 return ListView.builder(
                   itemCount: routes.length,
                   itemBuilder: (ctx, i) => ListTile(

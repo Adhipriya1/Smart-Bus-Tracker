@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-
 import 'package:supabase_flutter/supabase_flutter.dart';
-// import 'package:timeago/timeago.dart' as timeago; // Optional: for "5 mins ago"
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart';
 
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
@@ -12,21 +11,21 @@ class NotificationsScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Notifications"),
+        title: const TranslatedText("Notifications"),
         elevation: 1,
       ),
       body: StreamBuilder<List<Map<String, dynamic>>>(
         stream: supabase
             .from('notifications')
             .stream(primaryKey: ['id'])
-            .order('created_at', ascending: false), // Newest first
+            .order('created_at', ascending: false), 
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           
           final alerts = snapshot.data!;
           
           if (alerts.isEmpty) {
-            return const Center(child: Text("No new notifications"));
+            return const Center(child: TranslatedText("No new notifications"));
           }
 
           return ListView.separated(
@@ -39,9 +38,8 @@ class NotificationsScreen extends StatelessWidget {
                   backgroundColor: Colors.blue.shade50,
                   child: const Icon(Icons.notifications, color: Colors.blue),
                 ),
-                title: Text(alert['title'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text(alert['body']),
-                // trailing: Text(timeago.format(DateTime.parse(alert['created_at']))), // Use timeago if installed
+                title: TranslatedText(alert['title'] ?? 'Notification', style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: TranslatedText(alert['body'] ?? ''),
               );
             },
           );

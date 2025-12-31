@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart';
 
 import 'package:flutter_google_places_hoc081098/flutter_google_places_hoc081098.dart';
 import 'package:flutter_google_places_hoc081098/google_maps_webservice_places.dart';
@@ -16,8 +17,6 @@ import '../../common/services/location_service.dart';
 import 'manage_occupancy_screen.dart';
 import 'conductor_home_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-
- 
 
 class MapPlace {
   final String name;
@@ -57,8 +56,8 @@ class _TicketingScreenState extends State<TicketingScreen> {
   bool _isCalculatingFare = false;
   
   String _currentLocationName = "Locating...";
+  DateTime? _lastUploadTime;
   DateTime? _lastGeocodeTime;
-
   @override
   void initState() {
     super.initState();
@@ -70,20 +69,41 @@ class _TicketingScreenState extends State<TicketingScreen> {
     _startGpsAndAutomation();
   }
 
-  void _startGpsAndAutomation() async {
+void _startGpsAndAutomation() async {
     if (await _loc.checkPermissions()) {
-      _gpsSub = _loc.getStream().listen((Position pos) {
-        _db.updateLocation(widget.busId, pos.latitude, pos.longitude);
+      _gpsSub = _loc.getStream().listen((Position pos) async {
+        
+        // Throttling: Only update every 5 seconds to avoid lag
+        final now = DateTime.now();
+        if (_lastUploadTime == null || now.difference(_lastUploadTime!).inSeconds >= 5) {
+          _lastUploadTime = now;
+          
+          try {
+            // ✅ FIX: Only update the columns that actually exist in your database
+            await supabase.from('buses').update({
+              'current_latitude': pos.latitude,
+              'current_longitude': pos.longitude,
+              // 'lat': pos.latitude,   <-- DELETE THIS LINE
+              // 'long': pos.longitude  <-- DELETE THIS LINE
+            }).eq('id', widget.busId);
+            
+            debugPrint("📍 GPS Sent: ${pos.latitude}, ${pos.longitude}");
+          } catch (e) {
+            debugPrint("❌ Error sending GPS: $e");
+          }
+        }
+
+        // Update UI immediately for smoothness
         _updateCurrentLocationName(pos.latitude, pos.longitude);
         _checkForArrival(pos);
       });
     }
   }
 
-  Future<void> _updateCurrentLocationName(double lat, double lng) async {
-    if (_lastGeocodeTime != null && DateTime.now().difference(_lastGeocodeTime!).inSeconds < 10) {
-      return;
-    }
+Future<void> _updateCurrentLocationName(double lat, double lng) async {
+    // Basic checks
+    if (googleMapsApiKey.isEmpty) return;
+    if (_lastGeocodeTime != null && DateTime.now().difference(_lastGeocodeTime!).inSeconds < 5) return;
     _lastGeocodeTime = DateTime.now();
 
     try {
@@ -95,16 +115,53 @@ class _TicketingScreenState extends State<TicketingScreen> {
       final data = json.decode(response.body);
 
       if (data['status'] == 'OK') {
-        String bestName = data['results'][0]['formatted_address'];
-        if (bestName.contains(',')) {
-          bestName = bestName.split(',')[0]; 
+        final results = data['results'] as List;
+        String finalName = "Unknown Location";
+
+        if (results.isNotEmpty) {
+          // 1. Try to find a specific 'route' (Street Name) or 'sublocality' (Neighborhood)
+          // We look at the first result's components
+          final components = results[0]['address_components'] as List;
+          String? street;
+          String? area;
+
+          for (var c in components) {
+            final types = List<String>.from(c['types']);
+            if (types.contains('route')) {
+              street = c['long_name'];
+            }
+            if (types.contains('sublocality') || types.contains('sublocality_level_1')) {
+              area = c['long_name'];
+            }
+          }
+
+          // 2. Construct the name wisely
+          if (street != null && area != null) {
+            finalName = "$street, $area";
+          } else if (area != null) {
+            finalName = area; // e.g., "Kurla West"
+          } else if (street != null) {
+            finalName = street; // e.g., "LBS Marg"
+          } else {
+            // 3. Fallback: Use the second result (usually City/Area level) if the first is a Plus Code
+            if (results.length > 1) {
+               finalName = results[1]['formatted_address'].split(',')[0];
+            } else {
+               finalName = results[0]['formatted_address'].split(',')[0];
+            }
+          }
+        }
+        
+        // Remove Plus Codes explicitly if they still sneak in (e.g., "63FX+MF4")
+        if (finalName.contains('+') && finalName.length < 10) {
+           finalName = "Current Location";
         }
 
         if (mounted) {
           setState(() {
-            _currentLocationName = bestName;
+            _currentLocationName = finalName;
             _sourcePlace ??= MapPlace(
-                name: bestName, 
+                name: finalName, 
                 address: data['results'][0]['formatted_address'], 
                 lat: lat, 
                 long: lng
@@ -116,40 +173,55 @@ class _TicketingScreenState extends State<TicketingScreen> {
       debugPrint("Geocoding Error: $e");
     }
   }
-
   Future<void> _checkForArrival(Position pos) async {
-    final response = await supabase
-        .from('tickets')
-        .select()
-        .eq('bus_id', widget.busId)
-        .filter('alighted_at', 'is', null);
+    try {
+      final response = await supabase
+          .from('tickets')
+          .select()
+          .eq('bus_id', widget.busId)
+          .filter('alighted_at', 'is', null);
 
-    final activeTickets = List<Map<String, dynamic>>.from(response);
-    int droppedCount = 0;
+      final activeTickets = List<Map<String, dynamic>>.from(response);
+      int droppedCount = 0;
 
-    for (var ticket in activeTickets) {
-      final destLat = ticket['dest_lat']; 
-      final destLong = ticket['dest_long'];
+      for (var ticket in activeTickets) {
+        final destLat = ticket['dest_lat']; 
+        final destLong = ticket['dest_long'];
 
-      if (destLat != null && destLong != null) {
-        double dist = Geolocator.distanceBetween(pos.latitude, pos.longitude, destLat, destLong);
-        if (dist < 150) { 
-           await _dropPassenger(ticket['id']);
-           droppedCount++;
+        if (destLat != null && destLong != null) {
+          double dist = Geolocator.distanceBetween(pos.latitude, pos.longitude, destLat, destLong);
+          if (dist < 150) { 
+             await _dropPassenger(ticket['id']);
+             droppedCount++;
+          }
         }
       }
-    }
 
-    if (droppedCount > 0 && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("$droppedCount passengers arrived & dropped."), backgroundColor: Colors.orange)
-      );
+      if (droppedCount > 0 && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Text("$droppedCount "),
+                const TranslatedText("passengers arrived & dropped."),
+              ],
+            ), 
+            backgroundColor: Colors.orange
+          )
+        );
+      }
+    } catch (e) {
+      debugPrint("Arrival check error: $e");
     }
   }
 
   Future<void> _dropPassenger(String ticketId) async {
     await supabase.from('tickets').update({'alighted_at': DateTime.now().toIso8601String()}).eq('id', ticketId);
-    await supabase.rpc('decrement_occupancy', params: {'bus_id_param': widget.busId, 'count_param': 1});
+    try {
+       await supabase.rpc('decrement_occupancy', params: {'bus_id_param': widget.busId, 'count_param': 1});
+    } catch(e) {
+      debugPrint("RPC Error: $e"); // Handle missing RPC safely
+    }
   }
 
   Future<Map<String, double>> _fetchFareRules() async {
@@ -243,7 +315,11 @@ class _TicketingScreenState extends State<TicketingScreen> {
         'issued_at': DateTime.now().toIso8601String(),
       });
       
-      await supabase.rpc('increment_occupancy', params: {'bus_id_param': widget.busId});
+      try {
+        await supabase.rpc('increment_occupancy', params: {'bus_id_param': widget.busId});
+      } catch(e) {
+        debugPrint("RPC Error: $e");
+      }
       
       if (mounted) {
         setState(() { 
@@ -252,7 +328,9 @@ class _TicketingScreenState extends State<TicketingScreen> {
           _calculatedFare = 0.0;
           _tripDistance = 0.0;
         });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Ticket Issued"), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: TranslatedText("Ticket Issued"), backgroundColor: Colors.green)
+        );
       }
     } catch (e) {
       setState(() => _isIssuing = false);
@@ -332,7 +410,7 @@ class _TicketingScreenState extends State<TicketingScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text("Ticketing", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const TranslatedText("Ticketing", style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const Icon(Icons.people_alt_outlined),
@@ -373,7 +451,12 @@ class _TicketingScreenState extends State<TicketingScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("BUS: $plateNumber", style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                          Row(
+                            children: [
+                              const TranslatedText("BUS", style: TextStyle(fontWeight: FontWeight.bold)),
+                              Text(": $plateNumber", style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                            ],
+                          ),
                           const SizedBox(height: 4),
                           Row(
                             children: [
@@ -395,7 +478,7 @@ class _TicketingScreenState extends State<TicketingScreen> {
                       Column(
                         children: [
                           Text("$seatsLeft", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.green)),
-                          Text("Seats Left", style: TextStyle(fontSize: 10, color: textColor)),
+                          const TranslatedText("Seats Left", style: TextStyle(fontSize: 10)),
                         ],
                       )
                     ],
@@ -415,7 +498,7 @@ class _TicketingScreenState extends State<TicketingScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("Issue Ticket", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
+                    const TranslatedText("Issue Ticket", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     const Divider(height: 30),
 
                     _buildMapInput(
@@ -453,14 +536,14 @@ class _TicketingScreenState extends State<TicketingScreen> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text("Distance", style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[400] : Colors.grey[600])),
+                              TranslatedText("Distance", style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[400] : Colors.grey[600])),
                               Text("${_tripDistance.toStringAsFixed(1)} km", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textColor)),
                             ],
                           ),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              const Text("TOTAL FARE", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue)),
+                              const TranslatedText("TOTAL FARE", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue)),
                               _isCalculatingFare 
                                 ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                                 : Text("₹$_calculatedFare", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 24, color: Colors.blue)),
@@ -479,7 +562,7 @@ class _TicketingScreenState extends State<TicketingScreen> {
                         icon: const Icon(Icons.print),
                         label: _isIssuing 
                           ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
-                          : const Text("GENERATE TICKET"),
+                          : const TranslatedText("GENERATE TICKET"),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Theme.of(context).primaryColor,
                           foregroundColor: Colors.white,
@@ -516,16 +599,23 @@ class _TicketingScreenState extends State<TicketingScreen> {
             Icon(icon, color: color),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                value ?? "Search $label",
-                style: TextStyle(
-                  color: value == null ? Colors.grey : textColor,
-                  fontWeight: value == null ? FontWeight.normal : FontWeight.bold,
-                  fontSize: 16
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+              child: value != null 
+                ? Text(
+                    value,
+                    style: TextStyle(
+                      color: textColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  )
+                : Row(
+                    children: [
+                      const TranslatedText("Search ", style: TextStyle(color: Colors.grey, fontSize: 16)),
+                      TranslatedText(label, style: const TextStyle(color: Colors.grey, fontSize: 16)),
+                    ],
+                  ),
             ),
             const Icon(Icons.search, color: Colors.grey),
           ],

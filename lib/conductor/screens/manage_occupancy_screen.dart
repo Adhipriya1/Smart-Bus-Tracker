@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:smart_bus_tracker/l10n/app_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 
@@ -34,7 +35,8 @@ class _ManageOccupancyScreenState extends State<ManageOccupancyScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+        final loc = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc?.errorSending(e) ?? 'Error: $e')));
       }
     }
   }

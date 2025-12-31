@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Required for SystemNavigator
+import 'package:flutter/services.dart'; 
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart'; 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:smart_bus_tracker/common/widgets/language_selector.dart'; 
 
-// Import feature screens
 import 'cash_tally_screen.dart';      
 import 'lost_found_screen.dart';      
 import 'trip_history_screen.dart';    
@@ -21,7 +22,10 @@ class ConductorHomeScreen extends StatefulWidget {
 
 class _ConductorHomeScreenState extends State<ConductorHomeScreen> {
   final SupabaseClient supabase = Supabase.instance.client;
-  final user = Supabase.instance.client.auth.currentUser;
+  
+  // 🟢 MOVED USER GETTER HERE so we can refresh it easily
+  User? get user => Supabase.instance.client.auth.currentUser;
+  
   bool _isSyncing = false;
   bool _isSendingSOS = false;
 
@@ -33,7 +37,7 @@ class _ConductorHomeScreenState extends State<ConductorHomeScreen> {
       setState(() => _isSyncing = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Row(children: [Icon(Icons.check_circle, color: Colors.white), SizedBox(width: 10), Text("Data Synced Successfully!")]),
+          content: Row(children: [Icon(Icons.check_circle, color: Colors.white), SizedBox(width: 10), TranslatedText("Data Synced Successfully!")]),
           backgroundColor: Colors.green,
           behavior: SnackBarBehavior.floating,
         ),
@@ -45,14 +49,21 @@ class _ConductorHomeScreenState extends State<ConductorHomeScreen> {
     final shouldSend = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(children: [Icon(Icons.warning, color: Colors.red), SizedBox(width: 10), Text("CONFIRM EMERGENCY")]),
-        content: const Text("Are you sure you want to send an SOS Alert to the Admin? This will share your live location."),
+        title: const Row(children: [
+          Icon(Icons.warning, color: Colors.red), 
+          SizedBox(width: 10), 
+          TranslatedText("CONFIRM EMERGENCY") 
+        ]),
+        content: const TranslatedText("Are you sure you want to send an SOS Alert to the Admin? This will share your live location."),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("CANCEL")),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false), 
+            child: const TranslatedText("CANCEL") 
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(ctx, true), 
-            child: const Text("SEND SOS"),
+            child: const TranslatedText("SEND SOS"), 
           ),
         ],
       ),
@@ -86,17 +97,20 @@ class _ConductorHomeScreenState extends State<ConductorHomeScreen> {
           context: context,
           builder: (_) => AlertDialog(
             backgroundColor: Colors.red[50],
-            title: const Row(children: [Icon(Icons.check_circle, color: Colors.red), SizedBox(width: 10), Text("ALERT SENT")]),
-            content: const Text("Admin has been notified with your location. Help is on the way."),
+            title: const Row(children: [Icon(Icons.check_circle, color: Colors.red), SizedBox(width: 10), TranslatedText("ALERT SENT")]),
+            content: const TranslatedText("Admin has been notified with your location."), 
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text("CLOSE", style: TextStyle(color: Colors.red)))
+              TextButton(
+                onPressed: () => Navigator.pop(context), 
+                child: const TranslatedText("CLOSE", style: TextStyle(color: Colors.red)) 
+              )
             ],
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error sending SOS: $e"), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
       }
     } finally {
       if (mounted) setState(() => _isSendingSOS = false);
@@ -105,22 +119,25 @@ class _ConductorHomeScreenState extends State<ConductorHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final email = user?.email ?? "Conductor";
-    final name = email.split('@')[0].toUpperCase();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // 🟢 FIX: Read 'full_name' from metadata. Fallback to Email if empty.
+    final String email = user?.email ?? "Conductor";
+    final String name = user?.userMetadata?['full_name'] ?? email.split('@')[0].toUpperCase();
 
-    // WRAPPED IN POPSCOPE to handle Back Button
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bool isTamil = Localizations.localeOf(context).languageCode == 'ta';
+
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) {
         if (didPop) return;
-        SystemNavigator.pop(); // Exit App
+        SystemNavigator.pop(); 
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text("Smart Bus", style: TextStyle(fontWeight: FontWeight.bold)),
+          title: TranslatedText("Smart Bus Tracker", style: TextStyle(fontWeight: FontWeight.bold, fontSize: isTamil ? 18 : 22)), 
           elevation: 0,
           actions: [
+            const LanguageButton(),
             Padding(
               padding: const EdgeInsets.only(right: 16.0),
               child: GestureDetector(
@@ -139,7 +156,7 @@ class _ConductorHomeScreenState extends State<ConductorHomeScreen> {
                       else
                         const Icon(Icons.sos, color: Colors.white, size: 18),
                       const SizedBox(width: 4),
-                      const Text("SOS", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      const Text("SOS", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), 
                     ],
                   ),
                 ),
@@ -153,13 +170,14 @@ class _ConductorHomeScreenState extends State<ConductorHomeScreen> {
             children: [
               UserAccountsDrawerHeader(
                 decoration: BoxDecoration(color: Theme.of(context).primaryColor),
+                // 🟢 Display the correct Name and Email
                 accountName: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 accountEmail: Text(email),
                 currentAccountPicture: const CircleAvatar(backgroundColor: Colors.white, child: Icon(Icons.person, size: 40, color: Colors.blue)),
               ),
               ListTile(
                 leading: const Icon(Icons.history),
-                title: const Text("Trip History"),
+                title: const TranslatedText("My Rides History"), 
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const TripHistoryScreen()));
@@ -167,17 +185,19 @@ class _ConductorHomeScreenState extends State<ConductorHomeScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.settings),
-                title: const Text("Settings"),
-                onTap: () {
+                title: const TranslatedText("Settings"), 
+                onTap: () async {
                   Navigator.pop(context);
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                  // 🟢 FIX: Wait for user to return, then refresh (setState)
+                  await Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                  setState(() {}); 
                 },
               ),
               const Spacer(),
               const Divider(),
               ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
-                title: const Text("Logout", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                title: const TranslatedText("Logout", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)), 
                 onTap: () async {
                   await Supabase.instance.client.auth.signOut();
                   if (mounted) Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
@@ -193,48 +213,64 @@ class _ConductorHomeScreenState extends State<ConductorHomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Hello, $name", style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
-              Text("Ready for your shift?", style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey)),
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  TranslatedText("Hello", style: TextStyle(fontSize: isTamil ? 20 : 24, fontWeight: FontWeight.w800)),
+                  // 🟢 Name will now update correctly
+                  Text(", $name", style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontSize: isTamil ? 20 : 24 
+                  )),
+                ],
+              ),
+              const TranslatedText("Ready for your shift?", style: TextStyle(color: Colors.grey)),
               const SizedBox(height: 24),
 
               _buildHeroCard(
-                title: "Start New Trip",
-                subtitle: "Select Bus & Route",
+                title: "Start New Trip", 
+                subtitle: "Select a Bus", 
                 icon: Icons.directions_bus_filled,
                 color: Theme.of(context).primaryColor, 
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TripSelectionScreen())),
+                isTamil: isTamil, 
               ),
 
               const SizedBox(height: 30),
               
-              Text("Shift Tools", style: Theme.of(context).textTheme.titleLarge),
+              TranslatedText("Shift Tools", style: TextStyle(fontSize: isTamil ? 18 : 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 15),
               
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildToolCard(
-                      "Cash Tally", 
-                      Icons.calculate, 
-                      Colors.green, 
-                      () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CashTallyScreen(busId: 'BUS-123')))
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: _buildToolCard(
+                        "Collections", 
+                        Icons.calculate, 
+                        Colors.green, 
+                        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CashTallyScreen(busId: 'BUS-123'))),
+                        isTamil 
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: _buildToolCard(
-                      "Lost & Found", 
-                      Icons.backpack, 
-                      Colors.orange, 
-                      () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LostFoundScreen(busId: 'BUS-123')))
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: _buildToolCard(
+                        "Log Lost Item", 
+                        Icons.backpack, 
+                        Colors.orange, 
+                        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LostFoundScreen(busId: 'BUS-123'))),
+                        isTamil 
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
 
               const SizedBox(height: 30),
               
-              Text("Support", style: Theme.of(context).textTheme.titleLarge),
+              TranslatedText("Support", style: TextStyle(fontSize: isTamil ? 18 : 20, fontWeight: FontWeight.bold)), 
               const SizedBox(height: 15),
               
               Container(
@@ -251,26 +287,36 @@ class _ConductorHomeScreenState extends State<ConductorHomeScreen> {
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildQuickAction(
-                      _isSyncing ? Icons.hourglass_top : Icons.sync, 
-                      "Sync Data", 
-                      Colors.blue, 
-                      _isSyncing ? () {} : _handleSync
+                    Expanded(
+                      child: _buildQuickAction(
+                        _isSyncing ? Icons.hourglass_top : Icons.sync, 
+                        "Sync Data", 
+                        Colors.blue, 
+                        _isSyncing ? () {} : _handleSync,
+                        isTamil
+                      ),
                     ),
                     _buildVerticalDivider(isDark),
-                    _buildQuickAction(
-                      Icons.report_problem_rounded, 
-                      "Report", 
-                      Colors.redAccent, 
-                      () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportIssueScreen()))
+                    Expanded(
+                      child: _buildQuickAction(
+                        Icons.report_problem_rounded, 
+                        "Report Bug", 
+                        Colors.redAccent, 
+                        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportIssueScreen())),
+                        isTamil
+                      ),
                     ),
                     _buildVerticalDivider(isDark),
-                    _buildQuickAction(
-                      Icons.help_outline, 
-                      "Help", 
-                      Colors.purple, 
-                      () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpScreen()))
+                    Expanded(
+                      child: _buildQuickAction(
+                        Icons.help_outline, 
+                        "Help", 
+                        Colors.purple, 
+                        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpScreen())),
+                        isTamil
+                      ),
                     ),
                   ],
                 ),
@@ -283,7 +329,7 @@ class _ConductorHomeScreenState extends State<ConductorHomeScreen> {
     );
   }
 
-  Widget _buildHeroCard({required String title, required String subtitle, required IconData icon, required Color color, required VoidCallback onTap}) {
+  Widget _buildHeroCard({required String title, required String subtitle, required IconData icon, required Color color, required VoidCallback onTap, required bool isTamil}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -307,15 +353,17 @@ class _ConductorHomeScreenState extends State<ConductorHomeScreen> {
               child: Icon(icon, color: Colors.white, size: 32),
             ),
             const SizedBox(width: 20),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                Text(subtitle, style: const TextStyle(color: Colors.white70, fontSize: 14)),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TranslatedText(title, style: TextStyle(color: Colors.white, fontSize: isTamil ? 17 : 20, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  TranslatedText(subtitle, style: TextStyle(color: Colors.white70, fontSize: isTamil ? 12 : 14)),
+                ],
+              ),
             ),
-            const Spacer(),
+            const SizedBox(width: 8),
             const Icon(Icons.arrow_forward_ios, color: Colors.white70, size: 18),
           ],
         ),
@@ -323,13 +371,13 @@ class _ConductorHomeScreenState extends State<ConductorHomeScreen> {
     );
   }
 
-  Widget _buildToolCard(String title, IconData icon, Color color, VoidCallback onTap) {
+  Widget _buildToolCard(String title, IconData icon, Color color, VoidCallback onTap, bool isTamil) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 110, 
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
         decoration: BoxDecoration(
           color: Theme.of(context).cardTheme.color,
           borderRadius: BorderRadius.circular(20),
@@ -350,14 +398,22 @@ class _ConductorHomeScreenState extends State<ConductorHomeScreen> {
               child: Icon(icon, color: color, size: 24),
             ),
             const SizedBox(height: 12),
-            Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Theme.of(context).textTheme.bodyLarge?.color)),
+            TranslatedText(
+              title, 
+              textAlign: TextAlign.center, 
+              style: TextStyle(
+                fontWeight: FontWeight.bold, 
+                fontSize: isTamil ? 11 : 13, 
+                color: Theme.of(context).textTheme.bodyLarge?.color
+              )
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildQuickAction(IconData icon, String label, Color color, VoidCallback onTap) {
+  Widget _buildQuickAction(IconData icon, String label, Color color, VoidCallback onTap, bool isTamil) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -365,7 +421,15 @@ class _ConductorHomeScreenState extends State<ConductorHomeScreen> {
         children: [
           Icon(icon, color: color, size: 26),
           const SizedBox(height: 8),
-          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
+          TranslatedText(
+            label, 
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: isTamil ? 10 : 12, 
+              fontWeight: FontWeight.w600, 
+              color: Colors.grey
+            )
+          ),
         ],
       ),
     );

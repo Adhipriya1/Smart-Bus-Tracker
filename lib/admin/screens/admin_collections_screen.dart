@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart'; // Updated Import
 
 class AdminCollectionsScreen extends StatelessWidget {
   const AdminCollectionsScreen({super.key});
@@ -14,21 +15,20 @@ class AdminCollectionsScreen extends StatelessWidget {
     }
   }
 
-  // Function to delete a record with confirmation
   Future<void> _deleteRecord(BuildContext context, String id) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Delete Record?"),
-        content: const Text("This action cannot be undone."),
+        title: const TranslatedText("Delete Record?"),
+        content: const TranslatedText("This action cannot be undone."),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text("CANCEL"),
+            child: const TranslatedText("CANCEL"),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text("DELETE", style: TextStyle(color: Colors.red)),
+            child: const TranslatedText("DELETE", style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -36,11 +36,6 @@ class AdminCollectionsScreen extends StatelessWidget {
 
     if (confirmed == true) {
       await Supabase.instance.client.from('daily_collections').delete().eq('id', id);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Record deleted successfully.")),
-        );
-      }
     }
   }
 
@@ -50,88 +45,52 @@ class AdminCollectionsScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Daily Collections")),
+      appBar: AppBar(title: const TranslatedText("Daily Collections")),
       body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: supabase
-            .from('daily_collections')
-            .stream(primaryKey: ['id'])
-            .order('created_at', ascending: false), 
+        stream: supabase.from('daily_collections').stream(primaryKey: ['id']).order('date', ascending: false),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text("No collections recorded yet."));
-          }
-
-          final collections = snapshot.data!;
+          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+          
+          final data = snapshot.data ?? [];
+          if (data.isEmpty) return const Center(child: TranslatedText("No collections recorded yet."));
 
           return ListView.builder(
             padding: const EdgeInsets.all(16),
-            itemCount: collections.length,
-            itemBuilder: (ctx, i) {
-              final item = collections[i];
-              final amount = item['amount_collected'] ?? 0;
-              final busId = item['bus_id'] ?? "Unknown Bus";
-              final dateStr = _formatDate(item['date']);
-              final id = item['id'];
+            itemCount: data.length,
+            itemBuilder: (context, index) {
+              final record = data[index];
+              final amount = record['amount_collected'];
+              final date = _formatDate(record['date']);
+              final busId = record['bus_id'] ?? 'Unknown Bus';
+              final id = record['id'];
 
               return Card(
-                elevation: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                color: isDark ? Colors.grey[800] : Colors.white,
+                elevation: 3,
+                margin: const EdgeInsets.only(bottom: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // --- TOP SECTION: DETAILS ---
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12)
-                            ),
-                            child: const Icon(Icons.directions_bus, color: Colors.blue),
-                          ),
-                          const SizedBox(width: 16),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                busId, 
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  const Text("Date: ", style: TextStyle(color: Colors.grey, fontSize: 14)),
-                                  Text(
-                                    dateStr, 
-                                    style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600], fontSize: 14)
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12.0),
-                        child: Divider(),
-                      ),
-                      
-                      // --- BOTTOM SECTION: RATE & DELETE BUTTON ---
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // RATE (Amount)
+                          TranslatedText("Date: $date", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(8)),
+                            child: Text(busId, style: TextStyle(color: Colors.blue[900], fontWeight: FontWeight.bold)),
+                          )
+                        ],
+                      ),
+                      const Divider(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
                           Row(
                             children: [
-                              const Text("Total: ", style: TextStyle(fontWeight: FontWeight.bold)),
+                              const TranslatedText("Total: ", style: TextStyle(fontWeight: FontWeight.bold)),
                               Text(
                                 "₹$amount", 
                                 style: const TextStyle(
@@ -143,14 +102,12 @@ class AdminCollectionsScreen extends StatelessWidget {
                             ],
                           ),
                           
-                          // DELETE BUTTON
                           ElevatedButton.icon(
                             onPressed: () => _deleteRecord(context, id),
                             icon: const Icon(Icons.delete_outline, size: 18, color: Colors.white),
-                            label: const Text("Delete"),
+                            label: const TranslatedText("Delete", style: TextStyle(color: Colors.white)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.redAccent,
-                              foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             ),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart'; // Updated Import
 
 class LegalContentScreen extends StatelessWidget {
   final String title;
@@ -15,6 +15,7 @@ class LegalContentScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     String content = "";
 
+    // TranslatedText will translate this entire block if the user switches language.
     if (contentType == "terms") {
       content = """
 **Terms and Conditions**
@@ -38,10 +39,10 @@ class LegalContentScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(title: TranslatedText(title)), 
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
-        child: Text(
+        child: TranslatedText(
           content,
           style: const TextStyle(fontSize: 16, height: 1.5),
         ),

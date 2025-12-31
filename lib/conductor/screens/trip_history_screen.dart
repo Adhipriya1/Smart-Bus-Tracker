@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart'; // Updated Import
 
 class TripHistoryScreen extends StatefulWidget {
   const TripHistoryScreen({super.key});
@@ -35,17 +35,11 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Theme variables for Dark/Light mode
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black87;
-    final subTextColor = isDark ? Colors.grey[400] : Colors.grey[600];
-    final cardColor = Theme.of(context).cardTheme.color;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Trip History"),
-      ),
-      body: isLoading
+      appBar: AppBar(title: const TranslatedText("Trip History")),
+      body: isLoading 
           ? const Center(child: CircularProgressIndicator())
           : ListView.builder(
               padding: const EdgeInsets.all(16),
@@ -53,58 +47,42 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
               itemBuilder: (context, index) {
                 final trip = history[index];
                 return Card(
-                  elevation: 2,
                   margin: const EdgeInsets.only(bottom: 16),
-                  color: cardColor,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 2,
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 1. TOP SECTION: Trip Details
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(0),
-                              decoration: BoxDecoration(
-                                color: isDark ? Colors.blue.withOpacity(0.2) : Colors.blue.shade50,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(Icons.history, color: isDark ? Colors.blue[200] : Colors.blue),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(8)),
+                              child: Text(trip['date'], style: TextStyle(color: Colors.blue[900], fontWeight: FontWeight.bold)),
                             ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    trip['route'],
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textColor),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Icon(Icons.calendar_today, size: 14, color: subTextColor),
-                                      const SizedBox(width: 6),
-                                      Text("${trip['date']} • ", style: TextStyle(color: subTextColor)),
-                                      Text("${trip['tickets']} ", style: TextStyle(color: subTextColor)),
-                                      Text("Passengers", style: TextStyle(color: subTextColor)),
-                                    ],
-                                  ),
-                                ],
-                              ),
+                            Row(
+                              children: [
+                                const Icon(Icons.confirmation_number_outlined, size: 16, color: Colors.grey),
+                                const SizedBox(width: 4),
+                                Text("${trip['tickets']} ", style: const TextStyle(fontWeight: FontWeight.bold)),
+                                const TranslatedText("Tickets", style: TextStyle(fontSize: 12)),
+                              ],
                             ),
                           ],
                         ),
-
-                        const SizedBox(height: 16),
-
-                        // 2. BOTTOM SECTION: Earnings Display (Full Width Container)
+                        const SizedBox(height: 12),
+                        const TranslatedText("ROUTE", style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+                        Text(trip['route'], style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                        
+                        const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider()),
+                        
                         Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: isDark ? Colors.green.withOpacity(0.2) : Colors.green.shade50,
+                            color: isDark ? Colors.green.withOpacity(0.1) : Colors.green[50],
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: isDark ? Colors.green.withOpacity(0.3) : Colors.green.shade100,
@@ -113,7 +91,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
+                              TranslatedText(
                                 "TOTAL EARNINGS",
                                 style: TextStyle(
                                   fontSize: 12,

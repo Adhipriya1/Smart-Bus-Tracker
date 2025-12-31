@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'ticketing_screen.dart'; //
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart'; // Updated Import
+import 'ticketing_screen.dart'; 
 
 class InspectionScreen extends StatefulWidget {
-  // Added arguments to pass data forward
   final String busId;
   final String routeId;
 
@@ -26,18 +26,16 @@ class _InspectionScreenState extends State<InspectionScreen> {
   Future<void> _submitInspection() async {
     if (!tiresOk || !fuelOk || !firstAidOk || !lightsOk) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("All checks must be passed to start!"), backgroundColor: Colors.red)
+        const SnackBar(content: TranslatedText("All checks must be passed to start!"), backgroundColor: Colors.red)
       );
       return;
     }
 
     setState(() => _isSubmitting = true);
     
-    // Simulate DB Save (In a real app, save inspection record here)
     await Future.delayed(const Duration(seconds: 1));
     
     if (mounted) {
-      // CHANGED: Navigate to Ticketing Screen
       Navigator.pushReplacement(
         context, 
         MaterialPageRoute(
@@ -54,7 +52,7 @@ class _InspectionScreenState extends State<InspectionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Pre-Trip Inspection"), 
+        title: const TranslatedText("Pre-Trip Inspection"), 
         backgroundColor: Colors.blue[900], 
         foregroundColor: Colors.white
       ),
@@ -63,8 +61,8 @@ class _InspectionScreenState extends State<InspectionScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Mandatory Safety Checks", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const Text("Please verify the following before starting:", style: TextStyle(color: Colors.grey)),
+            const TranslatedText("Mandatory Safety Checks", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const TranslatedText("Please verify the following before starting:", style: TextStyle(color: Colors.grey)),
             const SizedBox(height: 20),
             
             _buildCheckItem("Tires Pressure & Condition", tiresOk, (v) => setState(() => tiresOk = v!)),
@@ -81,7 +79,7 @@ class _InspectionScreenState extends State<InspectionScreen> {
                 onPressed: _isSubmitting ? null : _submitInspection,
                 child: _isSubmitting 
                   ? const CircularProgressIndicator(color: Colors.white) 
-                  : const Text("CONFIRM & PROCEED"),
+                  : const TranslatedText("CONFIRM & PROCEED"),
               ),
             )
           ],
@@ -92,7 +90,7 @@ class _InspectionScreenState extends State<InspectionScreen> {
 
   Widget _buildCheckItem(String title, bool value, Function(bool?) onChanged) {
     return CheckboxListTile(
-      title: Text(title, style: TextStyle(fontWeight: value ? FontWeight.bold : FontWeight.normal)),
+      title: TranslatedText(title, style: TextStyle(fontWeight: value ? FontWeight.bold : FontWeight.normal)),
       value: value,
       activeColor: Colors.green,
       onChanged: onChanged,

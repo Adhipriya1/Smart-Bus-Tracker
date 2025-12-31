@@ -1,7 +1,8 @@
-import 'dart:io'; // Needed for File
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart'; // Updated Import
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:image_picker/image_picker.dart'; // Import the picker
+import 'package:image_picker/image_picker.dart'; 
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -16,27 +17,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final user = Supabase.instance.client.auth.currentUser;
   
   bool _isLoading = false;
-  File? _imageFile; // To store the selected image locally
-  String? _avatarUrl; // To store the URL from Supabase
+  File? _imageFile;
+  String? _avatarUrl; 
 
   @override
   void initState() {
     super.initState();
     _nameCtrl.text = user?.userMetadata?['full_name'] ?? "";
-    _avatarUrl = user?.userMetadata?['avatar_url']; // Load existing image if any
+    _avatarUrl = user?.userMetadata?['avatar_url']; 
   }
 
-  // 1. Pick Image Function
   Future<void> _pickImage() async {
     try {
       final XFile? pickedFile = await _picker.pickImage(
-        source: ImageSource.gallery, // Or ImageSource.camera
-        maxWidth: 600, // Compress image size
+        source: ImageSource.gallery, 
+        maxWidth: 600, 
       );
 
       if (pickedFile != null) {
         setState(() => _imageFile = File(pickedFile.path));
-        // Optional: Upload immediately upon selection
         await _uploadImage(File(pickedFile.path)); 
       }
     } catch (e) {
@@ -44,29 +43,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  // 2. Upload Image Function
   Future<void> _uploadImage(File file) async {
     setState(() => _isLoading = true);
     try {
       final userId = user!.id;
       final fileExt = file.path.split('.').last;
-      final fileName = '$userId/avatar.$fileExt'; // Unique path per user
+      final fileName = '$userId/avatar.$fileExt'; 
 
-      // Upload to Supabase 'avatars' bucket
       await Supabase.instance.client.storage
           .from('avatars')
           .upload(
             fileName,
             file,
-            fileOptions: const FileOptions(upsert: true), // Overwrite old image
+            fileOptions: const FileOptions(upsert: true), 
           );
 
-      // Get Public URL
       final imageUrl = Supabase.instance.client.storage
           .from('avatars')
           .getPublicUrl(fileName);
 
-      // Update User Metadata with new URL
       await Supabase.instance.client.auth.updateUser(
         UserAttributes(data: {'avatar_url': imageUrl}),
       );
@@ -76,17 +71,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _isLoading = false;
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Image Uploaded!"), backgroundColor: Colors.green));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: TranslatedText("Image Uploaded!"), backgroundColor: Colors.green));
 
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Upload Failed: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload Failed: $e')));
       }
     }
   }
 
-  // 3. Update Name Function (Existing)
   Future<void> _updateProfile() async {
     setState(() => _isLoading = true);
     try {
@@ -94,11 +88,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         UserAttributes(data: {'full_name': _nameCtrl.text}),
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile Updated!"), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: TranslatedText('Profile Updated!'), backgroundColor: Colors.green));
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -107,8 +103,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Edit Profile")),
-      body: SingleChildScrollView( // Added scroll for small screens
+      appBar: AppBar(title: const TranslatedText("Edit Profile")),
+      body: SingleChildScrollView( 
         padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
@@ -117,21 +113,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               child: Stack(
                 alignment: Alignment.bottomRight,
                 children: [
-                  // IMAGE DISPLAY LOGIC
                   CircleAvatar(
                     radius: 60,
                     backgroundColor: Colors.grey[200],
                     backgroundImage: _imageFile != null
-                        ? FileImage(_imageFile!) // Show local file if just picked
+                        ? FileImage(_imageFile!) 
                         : (_avatarUrl != null 
-                            ? NetworkImage(_avatarUrl!) as ImageProvider // Show cloud URL if exists
+                            ? NetworkImage(_avatarUrl!) as ImageProvider 
                             : null), 
                     child: (_imageFile == null && _avatarUrl == null)
                         ? const Icon(Icons.person, size: 60, color: Colors.grey)
                         : null,
                   ),
                   
-                  // Camera Icon
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: const BoxDecoration(color: Colors.blue, shape: BoxShape.circle),
@@ -147,12 +141,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             
             TextField(
               controller: _nameCtrl,
-              decoration: const InputDecoration(labelText: "Full Name", border: OutlineInputBorder()),
+              decoration: const InputDecoration(label: TranslatedText("Full Name"), border: OutlineInputBorder()),
             ),
             const SizedBox(height: 20),
             TextField(
               enabled: false,
-              decoration: InputDecoration(labelText: "Email", border: const OutlineInputBorder(), hintText: user?.email),
+              decoration: InputDecoration(label: const TranslatedText("Email"), border: const OutlineInputBorder(), hintText: user?.email),
             ),
             
             const SizedBox(height: 40),
@@ -162,7 +156,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               height: 50,
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _updateProfile,
-                child: _isLoading ? const CircularProgressIndicator() : const Text("SAVE CHANGES"),
+                child: _isLoading ? const CircularProgressIndicator() : const TranslatedText("SAVE CHANGES"),
               ),
             ),
           ],

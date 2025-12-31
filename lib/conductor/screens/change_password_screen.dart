@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:smart_bus_tracker/l10n/app_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
@@ -28,7 +29,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) {
+      final loc = AppLocalizations.of(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc?.errorSending(e) ?? 'Error: $e')));
+    }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -45,7 +49,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             TextField(
               controller: _passwordCtrl,
               obscureText: true,
-              decoration: const InputDecoration(labelText: "New Password", border: OutlineInputBorder()),
+              decoration: InputDecoration(labelText: AppLocalizations.of(context)?.newPassword ?? 'New Password', border: const OutlineInputBorder()),
             ),
             const SizedBox(height: 30),
             SizedBox(

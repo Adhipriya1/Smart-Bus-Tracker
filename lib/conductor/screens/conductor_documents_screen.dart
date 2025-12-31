@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:smart_bus_tracker/common/widgets/translated_text.dart'; // Updated Import
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -29,14 +30,9 @@ class _ConductorDocumentsScreenState extends State<ConductorDocumentsScreen> {
       final fileExt = image.path.split('.').last;
       final fileName = '${user.id}/$docType.${DateTime.now().millisecondsSinceEpoch}.$fileExt';
       
-      // 1. Upload to Storage
       await supabase.storage.from('documents').upload(fileName, File(image.path));
-      
-      // 2. Get Public URL
       final imageUrl = supabase.storage.from('documents').getPublicUrl(fileName);
 
-      // 3. Upsert Record into DB (Update if exists, Insert if new)
-      // We first check if a document of this type already exists to update it or insert new
       final existing = await supabase
           .from('conductor_documents')
           .select()
@@ -47,7 +43,7 @@ class _ConductorDocumentsScreenState extends State<ConductorDocumentsScreen> {
       if (existing != null) {
         await supabase.from('conductor_documents').update({
           'document_url': imageUrl,
-          'is_verified': false, // Reset verification on new upload
+          'is_verified': false, 
           'created_at': DateTime.now().toIso8601String(),
         }).eq('id', existing['id']);
       } else {
@@ -61,10 +57,12 @@ class _ConductorDocumentsScreenState extends State<ConductorDocumentsScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Document Uploaded! Wait for verification."), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: TranslatedText('Document Uploaded! Wait for verification.'), backgroundColor: Colors.green));
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Upload failed: $e"), backgroundColor: Colors.red));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red));
+      }
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
@@ -76,7 +74,7 @@ class _ConductorDocumentsScreenState extends State<ConductorDocumentsScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("My Documents")),
+      appBar: AppBar(title: const TranslatedText('My Documents')),
       body: Column(
         children: [
           if (_isUploading) const LinearProgressIndicator(),
@@ -84,9 +82,8 @@ class _ConductorDocumentsScreenState extends State<ConductorDocumentsScreen> {
             child: StreamBuilder(
               stream: supabase.from('conductor_documents').stream(primaryKey: ['id']).eq('conductor_id', user?.id ?? ''),
               builder: (context, snapshot) {
-                final docs = snapshot.data ?? [];
+                final docs = snapshot.data ?? []; 
                 
-                // Helper to check status
                 bool isUploaded(String name) => docs.any((d) => d['document_name'] == name);
                 bool isVerified(String name) => docs.any((d) => d['document_name'] == name && d['is_verified'] == true);
 
@@ -123,8 +120,8 @@ class _ConductorDocumentsScreenState extends State<ConductorDocumentsScreen> {
           const Icon(Icons.info_outline, color: Colors.blue),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              "Please upload clear photos of your original documents. Admin will verify them shortly.",
+            child: TranslatedText(
+              'Please upload clear photos of your original documents. Admin will verify them shortly.',
               style: TextStyle(color: isDark ? Colors.blue[100] : Colors.blue[900]),
             ),
           ),
@@ -149,19 +146,19 @@ class _ConductorDocumentsScreenState extends State<ConductorDocumentsScreen> {
             color: uploaded ? (verified ? Colors.green : Colors.orange) : Colors.grey,
           ),
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(
-          uploaded ? (verified ? "Verified" : "Pending Verification") : "Not Uploaded",
+        title: TranslatedText(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: TranslatedText(
+          uploaded ? (verified ? 'Verified' : 'Pending Verification') : 'Not Uploaded',
           style: TextStyle(color: uploaded ? (verified ? Colors.green : Colors.orange) : Colors.grey, fontSize: 12),
         ),
         trailing: uploaded && verified
-          ? const Chip(label: Text("Done", style: TextStyle(color: Colors.white)), backgroundColor: Colors.green)
+          ? const Chip(label: TranslatedText('Done', style: TextStyle(color: Colors.white)), backgroundColor: Colors.green)
           : ElevatedButton(
               onPressed: () => _uploadDocument(title),
               style: ElevatedButton.styleFrom(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              child: Text(uploaded ? "Re-upload" : "Upload"),
+              child: TranslatedText(uploaded ? 'Re-upload' : 'Upload'),
             ),
       ),
     );
